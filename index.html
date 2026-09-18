@@ -68,9 +68,9 @@
   .drive-cat-cluster{display:flex; align-items:center; gap:8px; flex-shrink:0;}
   .drive-time-lg{font-family:'Press Start 2P', monospace; font-size:15px; color:var(--ink); text-align:right; line-height:1.35;}
   .drive-time-lg .drive-time-unit{display:block; font-size:8px; color:var(--ink-dim); margin-top:2px; letter-spacing:0.03em;}
-  .cat-badge{width:54px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; border:3px solid var(--ink); background:var(--cream-dim); padding:5px 2px; box-shadow:var(--shadow-sm);}
-  .cat-icon{font-size:22px; line-height:1;}
-  .cat-label{font-family:'Press Start 2P', monospace; font-size:6px; letter-spacing:0.01em; margin-top:4px; text-align:center; line-height:1.25; color:var(--ink); word-break:break-word;}
+  .cat-badge{width:68px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; border:3px solid var(--ink); background:var(--cream-dim); padding:5px 3px; box-shadow:var(--shadow-sm);}
+  .cat-icon{font-size:24px; line-height:1;}
+  .cat-label{font-family:'Press Start 2P', monospace; font-size:6.5px; letter-spacing:0; margin-top:4px; text-align:center; line-height:1; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
   .divider{border:0; border-top:3px solid var(--ink); margin:22px 0;}
   .status{font-size:14px; color:var(--sage); margin-top:8px; line-height:1.4;}
   .status.error{color:var(--rust);}
@@ -286,9 +286,19 @@ const CATEGORY_ICONS = {
   'Bakery': '\ud83e\uddc1', 'Vegetarian': '\ud83e\udd57', 'Wings': '\ud83c\udf57',
   'Deli': '\ud83e\udd6a', 'Bar & Grill': '\ud83c\udf7b', 'American': '\ud83c\udf7d\ufe0f'
 };
+const CATEGORY_SHORT = {
+  'Mexican': 'MEXICAN', 'Italian': 'ITALIAN', 'Pizza': 'PIZZA',
+  'Japanese': 'JAPAN', 'Thai': 'THAI', 'Chinese': 'CHINESE',
+  'Indian': 'INDIAN', 'Vietnamese': 'VIETNAM', 'Mediterranean': 'MEDITER',
+  'BBQ': 'BBQ', 'Steakhouse': 'STEAK', 'Seafood': 'SEAFOOD',
+  'Burgers': 'BURGERS', 'Brewery': 'BREWERY', 'Breakfast': 'BRKFAST',
+  'Bakery': 'BAKERY', 'Vegetarian': 'VEGGIE', 'Wings': 'WINGS',
+  'Deli': 'DELI', 'Bar & Grill': 'GRILL', 'American': 'AMERICAN'
+};
 function categoryBadge(category){
   const emoji = CATEGORY_ICONS[category] || '\ud83c\udf7d\ufe0f';
-  return `<div class="cat-badge"><div class="cat-icon">${emoji}</div><div class="cat-label">${escapeHtml((category||'').toUpperCase())}</div></div>`;
+  const label = CATEGORY_SHORT[category] || (category||'').toUpperCase().slice(0, 9);
+  return `<div class="cat-badge"><div class="cat-icon">${emoji}</div><div class="cat-label">${escapeHtml(label)}</div></div>`;
 }
 
 function mapsLinkForPlace(p){
@@ -339,6 +349,7 @@ async function findNearbyRestaurants(){
       distance: estimateMinutes(haversineMiles(state.settings.homeLat, state.settings.homeLng, r.geometry.location.lat, r.geometry.location.lng)),
       checked: true
     }));
+    mapped.sort((a,b)=>a.distance-b.distance);
     importResults = { results: mapped };
     importStatus = mapped.length === 0
       ? 'No new restaurants found in range — try a wider radius.'
@@ -348,6 +359,7 @@ async function findNearbyRestaurants(){
       try{
         const driveTimes = await fetchDriveTimes(state.settings.homeLat, state.settings.homeLng, mapped.map(m=>({lat:m.lat, lng:m.lng})));
         driveTimes.forEach((dt, i)=>{ if(dt) mapped[i].distance = dt.minutes; });
+        mapped.sort((a,b)=>a.distance-b.distance);
         renderImportResults();
       } catch(err){
         importStatus += ' (drive times unavailable — showing rough estimates)';
