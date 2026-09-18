@@ -89,7 +89,8 @@
 
   .voter-block{margin-bottom:20px;}
   .voter-name{font-size:12px; font-family:'Press Start 2P', monospace; color:var(--butter); text-shadow:2px 2px 0 var(--ink); margin-bottom:10px;}
-  .vote-row{display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:2px dashed var(--ink);}
+  .vote-row{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:2px dashed var(--ink);}
+  .vote-row .place-name{font-size:15px;}
   .vote-row:last-child{border-bottom:none;}
   .vote-controls{display:flex; gap:6px; flex-shrink:0;}
   .vbtn{width:36px; height:36px; border-radius:0; border:2px solid var(--ink); font-size:15px; display:flex; align-items:center; justify-content:center; background:var(--bg-raised); color:var(--ink);}
@@ -744,20 +745,24 @@ function renderRound(){
     if(!person) return;
     const votes = state.round.votes[personId] || [];
     const veto = state.round.vetoes[personId];
-    html += `<div class="voter-block"><div class="voter-name" style="display:flex; align-items:center; gap:8px;"><img class="avatar" src="${avatarForName(person.name)}" alt="">${escapeHtml(person.name)}</div>`;
+    html += `<div class="voter-block"><div class="voter-name" style="display:flex; align-items:center; gap:8px;"><img class="avatar" src="${avatarForName(person.name)}" alt="">${escapeHtml(person.name)}</div><div class="card" style="padding:4px 16px;">`;
     const placesByDrive = [...state.places].sort((a,b)=>a.distance-b.distance);
     placesByDrive.forEach(place=>{
       const voteOn = votes.includes(place.id);
       const vetoOn = veto === place.id;
       html += `<div class="vote-row">
-        <div>${escapeHtml(place.name)}</div>
+        <div class="drive-time-lg">${place.distance}<span class="drive-time-unit">min</span></div>
+        <div class="spot-name-col" style="text-align:left;">
+          <div class="place-name">${escapeHtml(place.name)}</div>
+          ${place.placeId ? `<a class="maplink" href="${mapsLinkForPlace(place)}" target="_blank" rel="noopener">View on Google Maps</a>` : ''}
+        </div>
         <div class="vote-controls">
           <button class="vbtn ${voteOn?'vote-on':''}" data-vote-person="${personId}" data-vote-place="${place.id}" title="Vote">&#9733;</button>
           <button class="vbtn ${vetoOn?'veto-on':''}" data-veto-person="${personId}" data-veto-place="${place.id}" title="Veto">&#10005;</button>
         </div>
       </div>`;
     });
-    html += `</div>`;
+    html += `</div></div>`;
   });
   html += `<button class="btn" id="spin-btn" style="margin-top:8px;">Spin</button>`;
   body.innerHTML = html;
