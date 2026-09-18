@@ -47,6 +47,7 @@
   .place-name{font-size:17px; font-weight:700; color:var(--ink);}
   .place-meta{font-size:13px; color:var(--ink-dim); margin-top:5px; display:flex; gap:6px; flex-wrap:wrap;}
   .chip{display:inline-block; padding:3px 8px; border-radius:0; border:2px solid var(--ink); font-size:12px; color:var(--ink); background:var(--cream-dim);}
+  .chip.rating{background:var(--butter);}
   button{font-family:inherit; border:none; cursor:pointer; background:none; color:inherit;}
   .btn{background:var(--butter); color:var(--ink); font-family:'Press Start 2P', monospace; font-weight:400; font-size:13px; padding:15px 18px; border:3px solid var(--ink); border-radius:var(--radius); width:100%; text-align:center; box-shadow:var(--shadow-sm); transition:transform .05s, box-shadow .05s;}
   .btn:active{transform:translate(3px,3px); box-shadow:0 0 0 var(--ink);}
@@ -344,6 +345,14 @@ function categoryBadge(category){
   return `<div class="cat-badge"><div class="cat-icon">${emoji}</div><div class="cat-label">${escapeHtml(label)}</div></div>`;
 }
 
+function ratingText(rating, count){
+  if(!rating) return '';
+  return `⭐ ${Number(rating).toFixed(1)}` + (count ? ` (${count})` : '');
+}
+function ratingChip(rating, count){
+  const t = ratingText(rating, count);
+  return t ? `<span class="chip rating">${t}</span>` : '';
+}
 function mapsLinkForPlace(p){
   if(!p || !p.placeId) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name || '')}&query_place_id=${encodeURIComponent(p.placeId)}`;
@@ -367,6 +376,8 @@ let lastLookupPlaceId = null;
 let lastLookupName = null;
 let lastLookupPrice = 2;
 let lastLookupHealth = 'moderate';
+let lastLookupRating = null;
+let lastLookupRatingCount = null;
 
 async function findNearbyRestaurants(){
   if(!state.settings.homeLat){
@@ -390,6 +401,8 @@ async function findNearbyRestaurants(){
       price: mapPriceLevel(r.price_level),
       health: guessHealth(r.name, r.types),
       distance: estimateMinutes(haversineMiles(state.settings.homeLat, state.settings.homeLng, r.geometry.location.lat, r.geometry.location.lng)),
+      rating: r.rating || null,
+      ratingCount: r.user_ratings_total || null,
       checked: true
     }));
     mapped.sort((a,b)=>a.distance-b.distance);
@@ -490,7 +503,7 @@ function renderPlacesList(){
         <div class="drive-time-lg">${p.distance}<span class="drive-time-unit">min</span></div>
         <div class="spot-name-col">
           <div class="place-name">${escapeHtml(p.name)}</div>
-          <div class="place-meta" style="justify-content:center;"><span class="chip">${lastVisited}</span></div>
+          <div class="place-meta" style="justify-content:center;"><span class="chip">${lastVisited}</span>${ratingChip(p.rating, p.ratingCount)}</div>
           ${p.placeId ? `<a class="maplink" href="${mapsLinkForPlace(p)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
         </div>
         ${categoryBadge(guessCategory(p.name))}
@@ -616,10 +629,12 @@ function attachPlacesTabHandlers(){
       document.getElementById('p-distance').value = estimateMinutes(miles);
       lastLookupPrice = mapPriceLevel(place.price_level);
       lastLookupHealth = guessHealth(place.name, place.types);
+      lastLookupRating = place.rating || null;
+      lastLookupRatingCount = place.user_ratings_total || null;
       nameEl.value = place.name;
       lastLookupPlaceId = place.place_id || null;
       lastLookupName = place.name;
-      statusEl.textContent = `Matched: ${place.formatted_address}`;
+      statusEl.textContent = `Matched: ${place.formatted_address}` + (lastLookupRating ? ` — ${ratingText(lastLookupRating, lastLookupRatingCount)}` : '');
       try{
         const driveTimes = await fetchDriveTimes(state.settings.homeLat, state.settings.homeLng, [{lat: place.lat, lng: place.lng}]);
         if(driveTimes[0]) document.getElementById('p-distance').value = driveTimes[0].minutes;
@@ -639,8 +654,10 @@ function attachPlacesTabHandlers(){
     const placeId = matched ? lastLookupPlaceId : null;
     const price = matched ? lastLookupPrice : 2;
     const health = matched ? lastLookupHealth : 'moderate';
-    state.places.push({ id: uid(), name, distance: isNaN(distance) ? 15 : distance, price, health, lastVisited: null, placeId });
-    lastLookupPlaceId = null; lastLookupName = null; lastLookupPrice = 2; lastLookupHealth = 'moderate';
+    const rating = matched ? lastLookupRating : null;
+    const ratingCount = matched ? lastLookupRatingCount : null;
+    state.places.push({ id: uid(), name, distance: isNaN(distance) ? 15 : distance, price, health, lastVisited: null, placeId, rating, ratingCount });
+    lastLookupPlaceId = null; lastLookupName = null; lastLookupPrice = 2; lastLookupHealth = 'moderate'; lastLookupRating = null; lastLookupRatingCount = null;
     saveState();
     document.getElementById('p-name').value = '';
     document.getElementById('p-distance').value = '';
@@ -662,6 +679,7 @@ function renderImportResults(){
           <div class="drive-time-lg">${r.distance}<span class="drive-time-unit">min</span></div>
           <div class="spot-name-col">
             <div class="place-name">${escapeHtml(r.name)}</div>
+            ${r.rating ? `<div class="place-meta" style="justify-content:center;">${ratingChip(r.rating, r.ratingCount)}</div>` : ''}
             ${r.placeId ? `<a class="maplink" href="${mapsLinkForPlace(r)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
           </div>
           ${categoryBadge(r.category)}
@@ -681,7 +699,8 @@ function renderImportResults(){
     importResults.results.filter(r=>r.checked).forEach(r=>{
       state.places.push({
         id: uid(), name: r.name, distance: r.distance,
-        price: r.price, health: r.health, lastVisited: null, placeId: r.placeId || null
+        price: r.price, health: r.health, lastVisited: null, placeId: r.placeId || null,
+        rating: r.rating || null, ratingCount: r.ratingCount || null
       });
     });
     importResults = null;
@@ -833,6 +852,7 @@ function renderRound(){
       <div class="drive-time-lg">${place.distance}<span class="drive-time-unit">min</span></div>
       <div class="spot-name-col" style="text-align:left;">
         <div class="place-name">${escapeHtml(place.name)}</div>
+        ${place.rating ? `<div class="place-meta">${ratingChip(place.rating, place.ratingCount)}</div>` : ''}
         ${place.placeId ? `<a class="maplink" href="${mapsLinkForPlace(place)}" target="_blank" rel="noopener">View on Google Maps</a>` : ''}
       </div>
       <div class="vote-controls">
@@ -1015,7 +1035,7 @@ async function doSpin(){
   if(weighted.length === 0){ alert("Nothing eligible right now — everything's either vetoed or closed. Try again closer to dinnertime, or free up a pick."); resetVotingFlow(); renderRound(); return; }
   const winner = weightedPick(weighted);
   const winnerLink = mapsLinkForPlace(winner);
-  const metaHtml = `${escapeHtml(guessCategory(winner.name))} · ${winner.distance} min drive` + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
+  const metaHtml = `${escapeHtml(guessCategory(winner.name))} · ${winner.distance} min drive` + (winner.rating ? ` · ${ratingText(winner.rating, winner.ratingCount)}` : '') + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
   runSpinReveal(winner.name, state.places.map(p=>p.name), metaHtml, doSpin, ()=>{
     const p = state.places.find(p=>p.id === winner.id);
     if(p) p.lastVisited = new Date().toISOString();
@@ -1049,7 +1069,9 @@ async function doLuckySpin(){
     category: guessCategory(r.name, r.types),
     lat: r.geometry.location.lat,
     lng: r.geometry.location.lng,
-    distance: estimateMinutes(haversineMiles(loc.lat, loc.lng, r.geometry.location.lat, r.geometry.location.lng))
+    distance: estimateMinutes(haversineMiles(loc.lat, loc.lng, r.geometry.location.lat, r.geometry.location.lng)),
+    rating: r.rating || null,
+    ratingCount: r.user_ratings_total || null
   }));
   showSpinStage('checking real drive times&hellip;');
   try{
@@ -1070,7 +1092,7 @@ async function doLuckySpin(){
 function luckySpinReveal(pool, maxMinutes){
   const winner = pool[Math.floor(Math.random() * pool.length)];
   const winnerLink = mapsLinkForPlace(winner);
-  const metaHtml = `${escapeHtml(winner.category)} · ${winner.distance} min drive` + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
+  const metaHtml = `${escapeHtml(winner.category)} · ${winner.distance} min drive` + (winner.rating ? ` · ${ratingText(winner.rating, winner.ratingCount)}` : '') + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
   runSpinReveal(winner.name, pool.map(p=>p.name), metaHtml,
     ()=>luckySpinReveal(pool, maxMinutes),
     ()=>{ resetVotingFlow(); renderRound(); }

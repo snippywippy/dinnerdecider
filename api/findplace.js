@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
     return;
   }
   try {
-    const fields = 'place_id,name,formatted_address,geometry,price_level,types';
+    const fields = 'place_id,name,formatted_address,geometry,price_level,types,rating,user_ratings_total';
     const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=${fields}&key=${key}`;
     const r = await fetch(url);
     const data = await r.json();
@@ -26,7 +26,9 @@ module.exports = async function handler(req, res) {
       lat: c.geometry.location.lat,
       lng: c.geometry.location.lng,
       price_level: c.price_level,
-      types: c.types
+      types: c.types,
+      rating: c.rating,
+      user_ratings_total: c.user_ratings_total
     });
   } catch (err) {
     res.status(500).json({ error: 'Find place failed: ' + err.message });
