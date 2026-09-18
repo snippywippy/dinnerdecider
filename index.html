@@ -63,6 +63,7 @@
   .icon-btn{width:30px; height:30px; border-radius:0; display:flex; align-items:center; justify-content:center; font-size:16px; border:2px solid var(--ink); color:var(--ink); background:var(--bg-raised); flex-shrink:0;}
   .icon-btn.remove:active{background:var(--rust); color:var(--cream);}
   .empty{text-align:center; color:var(--ink-dim); font-size:16px; padding:36px 20px; line-height:1.6;}
+  .maplink{display:inline-block; font-size:13px; color:var(--sage); text-decoration:underline; margin-top:6px;}
   .divider{border:0; border-top:3px solid var(--ink); margin:22px 0;}
   .status{font-size:14px; color:var(--sage); margin-top:8px; line-height:1.4;}
   .status.error{color:var(--rust);}
@@ -231,6 +232,47 @@ function guessHealth(name, types){
   return 'moderate';
 }
 
+function guessCategory(name, types){
+  const n = (name||'').toLowerCase();
+  const t = (types||[]).map(x=>x.toLowerCase());
+  const has = (...kws) => kws.some(k=>n.includes(k));
+  if(has('taco','mexican','cantina','margarita','burrito','taqueria','tex-mex','tex mex')) return 'Mexican';
+  if(has('olive garden','italian','trattoria','ristorante','pasta')) return 'Italian';
+  if(has('pizza')) return 'Pizza';
+  if(has('sushi','ramen','japanese','hibachi','izakaya')) return 'Japanese';
+  if(has('thai')) return 'Thai';
+  if(has('chinese','wok','panda express')) return 'Chinese';
+  if(has('indian','curry','tandoor')) return 'Indian';
+  if(has('vietnamese','pho ')) return 'Vietnamese';
+  if(has('mediterranean','greek','gyro','kabob','kebab','falafel')) return 'Mediterranean';
+  if(has('bbq','barbeque','barbecue','smokehouse','smoke house')) return 'BBQ';
+  if(has('steak','steakhouse','chophouse','chop house')) return 'Steakhouse';
+  if(has('seafood','oyster','crab','shrimp','fish camp','fish house')) return 'Seafood';
+  if(has('burger')) return 'Burgers';
+  if(has('brewery','brewing','brewhouse','brew house','taproom')) return 'Brewery';
+  if(has('cracker barrel','breakfast','brunch','pancake','waffle')) return 'Breakfast';
+  if(has('bakery','patisserie')) return 'Bakery';
+  if(has('vegan','vegetarian')) return 'Vegetarian';
+  if(has('wing')) return 'Wings';
+  if(has('deli','sandwich')) return 'Deli';
+  if(t.includes('bar')||has('pub','tavern','saloon','grill')) return 'Bar & Grill';
+  return 'American';
+}
+
+function mapsLinkForPlace(p){
+  if(!p || !p.placeId) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name || '')}&query_place_id=${encodeURIComponent(p.placeId)}`;
+}
+
+async function fetchDriveTimes(originLat, originLng, destinations){
+  if(!destinations || destinations.length === 0) return [];
+  const destStr = destinations.map(d=>`${d.lat},${d.lng}`).join(';');
+  const res = await fetch(`/api/drivetime?originLat=${originLat}&originLng=${originLng}&destinations=${encodeURIComponent(destStr)}`);
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error || 'Drive time lookup failed');
+  return data.results; // aligned with destinations: {minutes, miles} or null per entry
+}
+
 // ---------- Places tab (settings + list + import + manual add) ----------
 let showSettings = false;
 let importResults = null; // {results: [...], checked:Set}
@@ -319,11 +361,13 @@ function renderPlacesList(){
         <div>
           <div class="place-name">${escapeHtml(p.name)}</div>
           <div class="place-meta">
-            <span class="chip">${p.distance} min</span>
+            <span class="chip">${escapeHtml(guessCategory(p.name))}</span>
+            <span class="chip">${p.distance} min drive</span>
             <span class="chip">${'$'.repeat(p.price)}</span>
             <span class="chip">${healthLabel}</span>
             <span class="chip">${lastVisited}</span>
           </div>
+          ${p.placeId ? `<a class="maplink" href="${mapsLinkForPlace(p)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
         </div>
         <button class="icon-btn remove" data-remove-place="${p.id}">&times;</button>
       </div>
@@ -437,25 +481,36 @@ function attachPlacesTabHandlers(){
       const results = await nearbySearchAll(state.settings.homeLat, state.settings.homeLng, radiusMiles);
       const existingNames = new Set(state.places.map(p=>p.name.toLowerCase()));
       const filtered = results.filter(r => !existingNames.has((r.name||'').toLowerCase()));
-      importResults = {
-        results: filtered.map(r=>({
-          placeId: r.place_id,
-          name: r.name,
-          address: r.vicinity || '',
-          lat: r.geometry.location.lat,
-          lng: r.geometry.location.lng,
-          price: mapPriceLevel(r.price_level),
-          health: guessHealth(r.name, r.types),
-          checked: true
-        }))
-      };
-      importStatus = filtered.length === 0
+      const mapped = filtered.map(r=>({
+        placeId: r.place_id,
+        name: r.name,
+        category: guessCategory(r.name, r.types),
+        lat: r.geometry.location.lat,
+        lng: r.geometry.location.lng,
+        price: mapPriceLevel(r.price_level),
+        health: guessHealth(r.name, r.types),
+        distance: estimateMinutes(haversineMiles(state.settings.homeLat, state.settings.homeLng, r.geometry.location.lat, r.geometry.location.lng)),
+        checked: true
+      }));
+      importResults = { results: mapped };
+      importStatus = mapped.length === 0
         ? 'No new restaurants found in range — try a wider radius.'
-        : `Found ${filtered.length} spot${filtered.length===1?'':'s'}. Uncheck any you don't want, then add.`;
+        : `Found ${mapped.length} spot${mapped.length===1?'':'s'}. Uncheck any you don't want, then add.`;
+      renderPlacesTab();
+      if(mapped.length > 0){
+        try{
+          const driveTimes = await fetchDriveTimes(state.settings.homeLat, state.settings.homeLng, mapped.map(m=>({lat:m.lat, lng:m.lng})));
+          driveTimes.forEach((dt, i)=>{ if(dt) mapped[i].distance = dt.minutes; });
+          renderImportResults();
+        } catch(err){
+          importStatus += ' (drive times unavailable — showing rough estimates)';
+          renderPlacesTab();
+        }
+      }
     } catch(err){
       importStatus = 'Error: ' + err.message;
+      renderPlacesTab();
     }
-    renderPlacesTab();
   });
 
   const lookupBtn = document.getElementById('lookup-btn');
@@ -482,6 +537,10 @@ function attachPlacesTabHandlers(){
       lastLookupPlaceId = place.place_id || null;
       lastLookupName = place.name;
       statusEl.textContent = `Matched: ${place.formatted_address}`;
+      try{
+        const driveTimes = await fetchDriveTimes(state.settings.homeLat, state.settings.homeLng, [{lat: place.lat, lng: place.lng}]);
+        if(driveTimes[0]) document.getElementById('p-distance').value = driveTimes[0].minutes;
+      } catch(e){ /* keep the rough estimate already filled in */ }
     } catch(err){
       statusEl.textContent = 'Error: ' + err.message;
       statusEl.classList.add('error');
@@ -518,7 +577,12 @@ function renderImportResults(){
           <input type="checkbox" data-import-check="${i}" ${r.checked?'checked':''}>
           <div style="flex:1;">
             <div class="place-name" style="font-size:14.5px;">${escapeHtml(r.name)}</div>
-            <div class="place-meta">${escapeHtml(r.address)} &middot; ${'$'.repeat(r.price)}</div>
+            <div class="place-meta">
+              <span class="chip">${escapeHtml(r.category)}</span>
+              <span class="chip">${'$'.repeat(r.price)}</span>
+              <span class="chip">${r.distance} min drive</span>
+            </div>
+            ${r.placeId ? `<a class="maplink" href="${mapsLinkForPlace(r)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
             <select data-import-health="${i}">
               <option value="light" ${r.health==='light'?'selected':''}>Light</option>
               <option value="moderate" ${r.health==='moderate'?'selected':''}>Moderate</option>
@@ -544,9 +608,8 @@ function renderImportResults(){
   const addCheckedBtn = document.getElementById('add-checked-btn');
   if(addCheckedBtn) addCheckedBtn.addEventListener('click', ()=>{
     importResults.results.filter(r=>r.checked).forEach(r=>{
-      const miles = haversineMiles(state.settings.homeLat, state.settings.homeLng, r.lat, r.lng);
       state.places.push({
-        id: uid(), name: r.name, distance: estimateMinutes(miles),
+        id: uid(), name: r.name, distance: r.distance,
         price: r.price, health: r.health, lastVisited: null, placeId: r.placeId || null
       });
     });
@@ -767,7 +830,8 @@ async function doSpin(){
       clearInterval(interval);
       nameEl.classList.remove('spinning');
       nameEl.textContent = winner.name;
-      document.getElementById('winner-meta').textContent = `${winner.distance} min away · ${'$'.repeat(winner.price)} · ${winner.health}`;
+      const winnerLink = mapsLinkForPlace(winner);
+      document.getElementById('winner-meta').innerHTML = `${escapeHtml(guessCategory(winner.name))} · ${winner.distance} min drive · ${'$'.repeat(winner.price)} · ${winner.health}` + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
     }
   }, 80);
   document.getElementById('respin-btn').addEventListener('click', doSpin);
