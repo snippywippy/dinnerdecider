@@ -122,6 +122,11 @@
   .person-pill{align-items:center;}
   .app-footer{display:flex; gap:8px; padding-top:2px;}
   .app-footer .btn{width:auto; flex:1; font-size:10px; padding:12px 8px;}
+  .lucky-bar{display:flex; align-items:center; gap:8px; background:var(--butter); border:3px solid var(--ink); box-shadow:var(--shadow-sm); padding:10px 12px; margin-bottom:18px;}
+  .lucky-label{font-family:'Press Start 2P', monospace; font-size:9px; color:var(--ink); flex:1; line-height:1.4;}
+  .lucky-bar input{width:52px; padding:6px 4px; font-size:16px; text-align:center; flex-shrink:0;}
+  .lucky-unit{font-size:13px; color:var(--ink-dim); flex-shrink:0;}
+  .lucky-bar .btn{width:auto; flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -129,6 +134,13 @@
   <img src="/couple-sprite.png" alt="" class="hero-sprite">
   <h1 style="text-align:center;">Dinner Decider</h1>
   <p class="sub">Vote, veto, spin. No more circling for twenty minutes.</p>
+
+  <div class="lucky-bar">
+    <span class="lucky-label">Feeling lucky?<br>Max drive:</span>
+    <input id="lucky-minutes" type="number" inputmode="numeric" value="30" min="1">
+    <span class="lucky-unit">min</span>
+    <button class="btn small" id="lucky-spin-btn">Spin now</button>
+  </div>
 
   <div class="tabs">
     <div class="tab active" data-tab="round">Tonight</div>
@@ -941,17 +953,11 @@ function weightedPick(weighted){
 function slotLightsRow(){
   return `<div class="slot-lights">${Array.from({length:9}).map(()=>'<span class="slot-light"></span>').join('')}</div>`;
 }
-async function doSpin(){
-  const vetoedIds = new Set(Object.values(state.round.vetoes).flat());
-  const idsToCheck = state.places.filter(p=>!vetoedIds.has(p.id) && p.placeId).map(p=>p.placeId);
-  if(idsToCheck.length){
-    const checkingBody = document.getElementById('round-body');
-    checkingBody.innerHTML = `<div class="spin-stage"><div class="slot-frame">${slotLightsRow()}<div class="ticket"><div class="label">checking who's open&hellip;</div><div class="winner-name"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span></div></div>${slotLightsRow()}</div></div>`;
-    await refreshOpenStatus(idsToCheck);
-  }
-  const weighted = computeWeights();
-  if(weighted.length === 0){ alert("Nothing eligible right now — everything's either vetoed or closed. Try again closer to dinnertime, or free up a pick."); resetVotingFlow(); renderRound(); return; }
-  const winner = weightedPick(weighted);
+function showSpinStage(label){
+  document.getElementById('round-body').innerHTML = `<div class="spin-stage"><div class="slot-frame">${slotLightsRow()}<div class="ticket"><div class="label">${label}</div><div class="winner-name"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span></div></div>${slotLightsRow()}</div></div>`;
+}
+// Runs the reel-spin animation and reveal; shared by the normal vote-driven spin and the "Feeling lucky?" shortcut.
+function runSpinReveal(winnerName, namePool, metaHtml, onRespin, onConfirm){
   const body = document.getElementById('round-body');
   body.innerHTML = `
     <div class="spin-stage">
@@ -971,22 +977,34 @@ async function doSpin(){
     </div>
   `;
   const nameEl = document.getElementById('winner-name');
-  const names = state.places.map(p=>p.name);
   let ticks = 0;
   const maxTicks = 16;
   const interval = setInterval(()=>{
-    nameEl.textContent = names[Math.floor(Math.random()*names.length)];
+    nameEl.textContent = namePool[Math.floor(Math.random()*namePool.length)];
     ticks++;
     if(ticks >= maxTicks){
       clearInterval(interval);
       nameEl.classList.remove('spinning');
-      nameEl.textContent = winner.name;
-      const winnerLink = mapsLinkForPlace(winner);
-      document.getElementById('winner-meta').innerHTML = `${escapeHtml(guessCategory(winner.name))} · ${winner.distance} min drive` + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
+      nameEl.textContent = winnerName;
+      document.getElementById('winner-meta').innerHTML = metaHtml;
     }
   }, 80);
-  document.getElementById('respin-btn').addEventListener('click', doSpin);
-  document.getElementById('confirm-btn').addEventListener('click', ()=>{
+  document.getElementById('respin-btn').addEventListener('click', onRespin);
+  document.getElementById('confirm-btn').addEventListener('click', onConfirm);
+}
+async function doSpin(){
+  const vetoedIds = new Set(Object.values(state.round.vetoes).flat());
+  const idsToCheck = state.places.filter(p=>!vetoedIds.has(p.id) && p.placeId).map(p=>p.placeId);
+  if(idsToCheck.length){
+    showSpinStage("checking who's open&hellip;");
+    await refreshOpenStatus(idsToCheck);
+  }
+  const weighted = computeWeights();
+  if(weighted.length === 0){ alert("Nothing eligible right now — everything's either vetoed or closed. Try again closer to dinnertime, or free up a pick."); resetVotingFlow(); renderRound(); return; }
+  const winner = weightedPick(weighted);
+  const winnerLink = mapsLinkForPlace(winner);
+  const metaHtml = `${escapeHtml(guessCategory(winner.name))} · ${winner.distance} min drive` + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
+  runSpinReveal(winner.name, state.places.map(p=>p.name), metaHtml, doSpin, ()=>{
     const p = state.places.find(p=>p.id === winner.id);
     if(p) p.lastVisited = new Date().toISOString();
     state.round.votes = {};
@@ -996,6 +1014,58 @@ async function doSpin(){
     renderRound();
   });
 }
+
+// ---------- "Feeling lucky?" shortcut: skip voting entirely, spin among whatever's within X minutes of here ----------
+async function doLuckySpin(){
+  const minutesInput = document.getElementById('lucky-minutes');
+  const maxMinutes = parseInt(minutesInput && minutesInput.value, 10) || 30;
+  resetVotingFlow();
+  switchToTab('round');
+  showSpinStage('finding your location&hellip;');
+  let loc;
+  try{ loc = await locateUser(); }
+  catch(err){ alert('Could not get your location: ' + err.message); renderRound(); return; }
+  showSpinStage('scouting nearby spots&hellip;');
+  const radiusMiles = Math.max(3, Math.round(maxMinutes / 2));
+  let results;
+  try{ results = await nearbySearchAll(loc.lat, loc.lng, radiusMiles); }
+  catch(err){ alert('Search failed: ' + err.message); renderRound(); return; }
+  if(!results || results.length === 0){ alert('No open spots found nearby right now. Try a bigger max drive time.'); renderRound(); return; }
+  const mapped = results.map(r=>({
+    placeId: r.place_id,
+    name: r.name,
+    category: guessCategory(r.name, r.types),
+    lat: r.geometry.location.lat,
+    lng: r.geometry.location.lng,
+    distance: estimateMinutes(haversineMiles(loc.lat, loc.lng, r.geometry.location.lat, r.geometry.location.lng))
+  }));
+  showSpinStage('checking real drive times&hellip;');
+  try{
+    const driveTimes = await fetchDriveTimes(loc.lat, loc.lng, mapped.map(m=>({lat:m.lat, lng:m.lng})));
+    driveTimes.forEach((dt,i)=>{ if(dt) mapped[i].distance = dt.minutes; });
+  } catch(err){ /* keep rough estimates and carry on */ }
+  const inRange = mapped.filter(m=>m.distance <= maxMinutes);
+  if(inRange.length === 0){ alert(`Nothing found within ${maxMinutes} minutes. Try a bigger max drive time.`); renderRound(); return; }
+  const idsToCheck = inRange.filter(m=>m.placeId).map(m=>m.placeId);
+  if(idsToCheck.length){
+    showSpinStage("checking who's open&hellip;");
+    await refreshOpenStatus(idsToCheck);
+  }
+  const eligible = inRange.filter(m=>!isKnownClosed(m));
+  const pool = eligible.length ? eligible : inRange;
+  luckySpinReveal(pool, maxMinutes);
+}
+function luckySpinReveal(pool, maxMinutes){
+  const winner = pool[Math.floor(Math.random() * pool.length)];
+  const winnerLink = mapsLinkForPlace(winner);
+  const metaHtml = `${escapeHtml(winner.category)} · ${winner.distance} min drive` + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
+  runSpinReveal(winner.name, pool.map(p=>p.name), metaHtml,
+    ()=>luckySpinReveal(pool, maxMinutes),
+    ()=>{ resetVotingFlow(); renderRound(); }
+  );
+}
+
+document.getElementById('lucky-spin-btn').addEventListener('click', doLuckySpin);
 
 // ---------- Footer: refresh & clear spots ----------
 document.getElementById('refresh-app-btn').addEventListener('click', ()=>{
