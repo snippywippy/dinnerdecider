@@ -96,10 +96,15 @@
   @keyframes flicker{0%{opacity:0.3; transform:translateY(2px);} 50%{opacity:1; transform:translateY(0);} 100%{opacity:0.3; transform:translateY(2px);}}
   .spinning{animation:flicker .09s infinite;}
   .spinner-dot{display:inline-block; width:8px; height:8px; border-radius:0; background:var(--butter); margin:0 3px; animation:flicker .5s infinite;}
+  .hero-sprite{display:block; margin:0 auto 10px; width:56%; max-width:220px; height:auto; image-rendering:pixelated; image-rendering:crisp-edges;}
+  .avatar{width:24px; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; flex-shrink:0;}
+  .avatar.lg{width:38px;}
+  .person-pill{align-items:center;}
 </style>
 </head>
 <body>
 <div class="app">
+  <img src="/couple-sprite.png" alt="" class="hero-sprite">
   <h1>Where To</h1>
   <p class="sub">Vote, veto, spin. No more circling for twenty minutes.</p>
 
@@ -156,6 +161,12 @@ function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); 
 let state = loadState();
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function escapeHtml(str){ return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function avatarForName(name){
+  const n = (name||'').trim().toLowerCase();
+  if(n === 'austin') return '/austin-sprite.png';
+  if(n === 'annahita') return '/annahita-sprite.png';
+  return '/generic-sprite.png';
+}
 
 // ---------- Tabs ----------
 document.querySelectorAll('.tab').forEach(tab=>{
@@ -549,7 +560,10 @@ function renderPeopleManage(){
   if(state.people.length === 0){ list.innerHTML = '<div class="empty">No people yet. Add whoever might vote on a given night.</div>'; return; }
   list.innerHTML = state.people.map(person=>`
     <div class="card row">
-      <div class="place-name">${escapeHtml(person.name)}</div>
+      <div class="row" style="gap:10px;">
+        <img class="avatar lg" src="${avatarForName(person.name)}" alt="">
+        <div class="place-name">${escapeHtml(person.name)}</div>
+      </div>
       <button class="icon-btn remove" data-remove-person="${person.id}">&times;</button>
     </div>
   `).join('');
@@ -583,7 +597,7 @@ function renderRound(){
   let html = `<h2>Who's in tonight?</h2><p class="sub">Tap everyone voting this round.</p><div class="people-list">`;
   state.people.forEach(p=>{
     const isSel = sel.includes(p.id);
-    html += `<div class="person-pill ${isSel?'selected':''}" data-toggle-person="${p.id}">${escapeHtml(p.name)}</div>`;
+    html += `<div class="person-pill ${isSel?'selected':''}" data-toggle-person="${p.id}"><img class="avatar" src="${avatarForName(p.name)}" alt="">${escapeHtml(p.name)}</div>`;
   });
   html += `</div>`;
 
@@ -600,7 +614,7 @@ function renderRound(){
     if(!person) return;
     const votes = state.round.votes[personId] || [];
     const veto = state.round.vetoes[personId];
-    html += `<div class="voter-block"><div class="voter-name">${escapeHtml(person.name)}</div>`;
+    html += `<div class="voter-block"><div class="voter-name" style="display:flex; align-items:center; gap:8px;"><img class="avatar" src="${avatarForName(person.name)}" alt="">${escapeHtml(person.name)}</div>`;
     state.places.forEach(place=>{
       const voteOn = votes.includes(place.id);
       const vetoOn = veto === place.id;
