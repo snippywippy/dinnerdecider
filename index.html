@@ -141,22 +141,22 @@ function loadState(){
   const raw = localStorage.getItem(STORAGE_KEY);
   if(raw){ try { return migrate(JSON.parse(raw)); } catch(e){} }
   return {
-    places: [
-      { id: uid(), name: 'Mesa Taqueria', distance: 12, price: 2, health: 'moderate', lastVisited: null },
-      { id: uid(), name: 'Green Bowl Kitchen', distance: 9, price: 1, health: 'light', lastVisited: null },
-      { id: uid(), name: "Otto's Fish Camp", distance: 22, price: 3, health: 'light', lastVisited: null },
-      { id: uid(), name: 'Pinewood BBQ', distance: 15, price: 2, health: 'indulgent', lastVisited: null },
-      { id: uid(), name: 'Corner Pizza Co.', distance: 6, price: 1, health: 'indulgent', lastVisited: null }
-    ],
+    places: [],
     people: [ { id: uid(), name: 'Austin' }, { id: uid(), name: 'Annahita' } ],
     settings: { homeLabel:'', homeLat:null, homeLng:null, radiusMiles: 8 },
     round: { selectedPeople: [], votes: {}, vetoes: {} }
   };
 }
+const PLACEHOLDER_PLACE_NAMES = new Set([
+  'mesa taqueria', 'green bowl kitchen', "otto's fish camp", 'pinewood bbq', 'corner pizza co.'
+]);
 function migrate(s){
   if(!s.settings) s.settings = { homeLabel:'', homeLat:null, homeLng:null, radiusMiles: 8 };
   if(!s.people || s.people.length === 0){
     s.people = [ { id: uid(), name: 'Austin' }, { id: uid(), name: 'Annahita' } ];
+  }
+  if(s.places){
+    s.places = s.places.filter(p => !PLACEHOLDER_PLACE_NAMES.has((p.name||'').trim().toLowerCase()));
   }
   return s;
 }
