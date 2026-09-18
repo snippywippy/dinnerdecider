@@ -1,5 +1,30 @@
 function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+// Places we never want to see in the auto-import results.
+// Edit these lists any time — they only affect "Find restaurants", not manual lookups.
+const EXCLUDED_TYPES = new Set(['gas_station']);
+const EXCLUDED_NAME_KEYWORDS = [
+  // fast food
+  "mcdonald's", "mcdonalds", "burger king", "wendy's", "wendys", "taco bell", "kfc",
+  "kentucky fried chicken", "popeyes", "chick-fil-a", "chick fil a", "sonic drive-in", "sonic",
+  "arby's", "arbys", "hardee's", "hardees", "carl's jr", "carls jr", "jack in the box",
+  "white castle", "whataburger", "bojangles", "culver's", "culvers", "church's chicken",
+  "churchs chicken", "raising cane's", "raising canes", "zaxby's", "zaxbys", "del taco",
+  "in-n-out", "checkers", "rally's", "rallys", "long john silver's", "long john silvers",
+  "captain d's", "captain ds",
+  // pizza franchises
+  "domino's", "dominos", "pizza hut", "papa john's", "papa johns", "little caesars",
+  "papa murphy's", "papa murphys", "marco's pizza", "marcos pizza", "jet's pizza",
+  "jets pizza", "blaze pizza", "mod pizza", "hungry howie's", "hungry howies", "cicis",
+  "round table pizza", "godfather's pizza", "godfathers pizza"
+];
+function isExcluded(r) {
+  const types = r.types || [];
+  if (types.some(t => EXCLUDED_TYPES.has(t))) return true;
+  const name = (r.name || '').toLowerCase();
+  return EXCLUDED_NAME_KEYWORDS.some(k => name.includes(k));
+}
+
 module.exports = async function handler(req, res) {
   const { lat, lng, radiusMiles } = req.query;
   if (!lat || !lng) {
@@ -19,10 +44,13 @@ module.exports = async function handler(req, res) {
     let pageCount = 0;
 
     do {
-      let url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radiusMeters}&type=restaurant&key=${key}`;
+      let url;
       if (pageToken) {
-        url += `&pagetoken=${pageToken}`;
+        url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${pageToken}&key=${key}`;
         await delay(2000); // Google requires a short delay before a page token becomes valid
+      } else {
+        // opennow=true: only surface places that are open at the moment of searching.
+        url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radiusMeters}&type=restaurant&opennow=true&key=${key}`;
       }
       const r = await fetch(url);
       const data = await r.json();
@@ -34,6 +62,8 @@ module.exports = async function handler(req, res) {
       pageToken = data.next_page_token || null;
       pageCount++;
     } while (pageToken && allResults.length < 60 && pageCount < 3);
+
+    allResults = allResults.filter(r => !isExcluded(r));
 
     res.status(200).json({ results: allResults });
   } catch (err) {

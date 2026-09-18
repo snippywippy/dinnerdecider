@@ -209,6 +209,8 @@ let showSettings = false;
 let importResults = null; // {results: [...], checked:Set}
 let importStatus = '';
 let importLoading = false;
+let lastLookupPlaceId = null;
+let lastLookupName = null;
 
 function renderPlacesTab(){
   const el = document.getElementById('places-tab-body');
@@ -239,6 +241,7 @@ function renderPlacesTab(){
           <input id="radius-miles" type="number" inputmode="numeric" value="${s.radiusMiles}">
         </div>
         <button class="btn ghost" id="find-nearby-btn">Find restaurants</button>
+        <p class="sub" style="margin-top:8px; margin-bottom:0;">Skips fast food, pizza chains, and gas stations &mdash; and only lists places open right now.</p>
         <div class="status ${importStatus.startsWith('Error') ? 'error':''}" id="import-status">${importStatus}</div>
         <div id="import-results-mount"></div>
       </div>
@@ -449,6 +452,8 @@ function attachPlacesTabHandlers(){
       document.getElementById('p-price').value = mapPriceLevel(place.price_level);
       document.getElementById('p-health').value = guessHealth(place.name, place.types);
       nameEl.value = place.name;
+      lastLookupPlaceId = place.place_id || null;
+      lastLookupName = place.name;
       statusEl.textContent = `Matched: ${place.formatted_address}`;
     } catch(err){
       statusEl.textContent = 'Error: ' + err.message;
@@ -463,7 +468,9 @@ function attachPlacesTabHandlers(){
     const price = parseInt(document.getElementById('p-price').value, 10);
     const health = document.getElementById('p-health').value;
     if(!name){ document.getElementById('p-name').focus(); return; }
-    state.places.push({ id: uid(), name, distance: isNaN(distance) ? 15 : distance, price, health, lastVisited: null });
+    const placeId = (lastLookupName === name) ? lastLookupPlaceId : null;
+    state.places.push({ id: uid(), name, distance: isNaN(distance) ? 15 : distance, price, health, lastVisited: null, placeId });
+    lastLookupPlaceId = null; lastLookupName = null;
     saveState();
     document.getElementById('p-name').value = '';
     document.getElementById('p-distance').value = '';
@@ -513,7 +520,7 @@ function renderImportResults(){
       const miles = haversineMiles(state.settings.homeLat, state.settings.homeLng, r.lat, r.lng);
       state.places.push({
         id: uid(), name: r.name, distance: estimateMinutes(miles),
-        price: r.price, health: r.health, lastVisited: null
+        price: r.price, health: r.health, lastVisited: null, placeId: r.placeId || null
       });
     });
     importResults = null;
@@ -641,12 +648,38 @@ function attachVoteHandlers(){
   });
 }
 
+// ---------- Live "open now" status (checked right before spinning, cached briefly) ----------
+let openStatusCache = {}; // placeId -> { openNow, checkedAt }
+const OPEN_STATUS_TTL_MS = 20 * 60 * 1000; // re-check after 20 minutes
+async function refreshOpenStatus(placeIds){
+  const now = Date.now();
+  const stale = [...new Set(placeIds)].filter(id=>{
+    const c = openStatusCache[id];
+    return !c || (now - c.checkedAt) > OPEN_STATUS_TTL_MS;
+  });
+  if(stale.length === 0) return;
+  try{
+    const res = await fetch('/api/status?ids=' + encodeURIComponent(stale.join(',')));
+    const data = await res.json();
+    if(res.ok && data.results){
+      Object.entries(data.results).forEach(([id, openNow])=>{
+        openStatusCache[id] = { openNow, checkedAt: now };
+      });
+    }
+  } catch(e){ /* best effort — unknown places stay eligible */ }
+}
+function isKnownClosed(place){
+  if(!place.placeId) return false;
+  const status = openStatusCache[place.placeId];
+  return !!status && status.openNow === false;
+}
+
 // ---------- Weighting & Spin ----------
 function computeWeights(){
   const vetoedIds = new Set(Object.values(state.round.vetoes));
   const voteCounts = {};
   Object.values(state.round.votes).forEach(list=>{ list.forEach(placeId=>{ voteCounts[placeId] = (voteCounts[placeId]||0) + 1; }); });
-  const candidates = state.places.filter(p=>!vetoedIds.has(p.id));
+  const candidates = state.places.filter(p=>!vetoedIds.has(p.id) && !isKnownClosed(p));
   return candidates.map(place=>{
     let weight = 1;
     weight += (voteCounts[place.id] || 0) * 4;
@@ -668,9 +701,16 @@ function weightedPick(weighted){
   for(const w of weighted){ r -= w.weight; if(r <= 0) return w.place; }
   return weighted[weighted.length-1].place;
 }
-function doSpin(){
+async function doSpin(){
+  const vetoedIds = new Set(Object.values(state.round.vetoes));
+  const idsToCheck = state.places.filter(p=>!vetoedIds.has(p.id) && p.placeId).map(p=>p.placeId);
+  if(idsToCheck.length){
+    const checkingBody = document.getElementById('round-body');
+    checkingBody.innerHTML = `<div class="spin-stage"><div class="ticket"><div class="label">checking who's open&hellip;</div><div class="winner-name"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span></div></div></div>`;
+    await refreshOpenStatus(idsToCheck);
+  }
   const weighted = computeWeights();
-  if(weighted.length === 0){ alert("Everything's been vetoed — free up at least one spot."); return; }
+  if(weighted.length === 0){ alert("Nothing eligible right now — everything's either vetoed or closed. Try again closer to dinnertime, or free up a pick."); renderRound(); return; }
   const winner = weightedPick(weighted);
   const body = document.getElementById('round-body');
   body.innerHTML = `

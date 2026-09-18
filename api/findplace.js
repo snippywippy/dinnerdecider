@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
     return;
   }
   try {
-    const fields = 'name,formatted_address,geometry,price_level,types';
+    const fields = 'place_id,name,formatted_address,geometry,price_level,types';
     const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=${fields}&key=${key}`;
     const r = await fetch(url);
     const data = await r.json();
@@ -20,6 +20,7 @@ module.exports = async function handler(req, res) {
     }
     const c = data.candidates[0];
     res.status(200).json({
+      place_id: c.place_id,
       name: c.name,
       formatted_address: c.formatted_address,
       lat: c.geometry.location.lat,
