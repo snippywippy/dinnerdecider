@@ -122,10 +122,11 @@
   .person-pill{align-items:center;}
   .app-footer{display:flex; gap:8px; padding-top:2px;}
   .app-footer .btn{width:auto; flex:1; font-size:10px; padding:12px 8px;}
-  .lucky-bar{display:flex; align-items:center; gap:8px; background:var(--butter); border:3px solid var(--ink); box-shadow:var(--shadow-sm); padding:10px 12px; margin-bottom:18px;}
-  .lucky-label{font-family:'Press Start 2P', monospace; font-size:9px; color:var(--ink); flex:1; line-height:1.4;}
-  .lucky-bar input{width:52px; padding:6px 4px; font-size:16px; text-align:center; flex-shrink:0;}
-  .lucky-unit{font-size:13px; color:var(--ink-dim); flex-shrink:0;}
+  .lucky-bar{display:flex; align-items:center; gap:10px; background:var(--butter); border:3px solid var(--ink); box-shadow:var(--shadow-sm); padding:12px; margin-bottom:18px; flex-wrap:wrap;}
+  .lucky-label{font-family:'Press Start 2P', monospace; font-size:13px; color:var(--ink); flex:1 1 100%; line-height:1.4;}
+  .lucky-minutes-wrap{display:flex; align-items:center; gap:6px; flex:1; min-width:0; margin-left:6px;}
+  .lucky-minutes-wrap label{font-size:12px; color:var(--ink-dim); line-height:1.2;}
+  .lucky-bar select{width:auto; padding:6px 6px; font-size:16px; text-align:center; flex-shrink:0;}
   .lucky-bar .btn{width:auto; flex-shrink:0;}
 </style>
 </head>
@@ -136,9 +137,11 @@
   <p class="sub">Vote, veto, spin. No more circling for twenty minutes.</p>
 
   <div class="lucky-bar">
-    <span class="lucky-label">Feeling lucky?<br>Max drive:</span>
-    <input id="lucky-minutes" type="number" inputmode="numeric" value="30" min="1">
-    <span class="lucky-unit">min</span>
+    <span class="lucky-label">Feeling lucky?</span>
+    <div class="lucky-minutes-wrap">
+      <label for="lucky-minutes">Max drive in mins</label>
+      <select id="lucky-minutes"></select>
+    </div>
     <button class="btn small" id="lucky-spin-btn">Spin now</button>
   </div>
 
@@ -1074,6 +1077,16 @@ function luckySpinReveal(pool, maxMinutes){
   );
 }
 
+(function populateLuckyMinutes(){
+  const sel = document.getElementById('lucky-minutes');
+  for(let m = 5; m <= 60; m += 5){
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m + ' min';
+    if(m === 30) opt.selected = true;
+    sel.appendChild(opt);
+  }
+})();
 document.getElementById('lucky-spin-btn').addEventListener('click', doLuckySpin);
 
 // ---------- Footer: refresh & clear spots ----------
