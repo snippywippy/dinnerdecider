@@ -977,18 +977,27 @@ function runSpinReveal(winnerName, namePool, metaHtml, onRespin, onConfirm){
     </div>
   `;
   const nameEl = document.getElementById('winner-name');
-  let ticks = 0;
-  const maxTicks = 16;
-  const interval = setInterval(()=>{
-    nameEl.textContent = namePool[Math.floor(Math.random()*namePool.length)];
-    ticks++;
-    if(ticks >= maxTicks){
-      clearInterval(interval);
+  let tick = 0;
+  const totalTicks = 26;
+  const startDelay = 70;   // ms between ticks at full speed, right at the start
+  const endDelay = 480;    // ms between ticks right before it lands, like a reel easing to a stop
+  function nextTick(){
+    if(tick >= totalTicks){
       nameEl.classList.remove('spinning');
+      nameEl.style.animationDuration = '';
       nameEl.textContent = winnerName;
       document.getElementById('winner-meta').innerHTML = metaHtml;
+      return;
     }
-  }, 80);
+    nameEl.textContent = namePool[Math.floor(Math.random()*namePool.length)];
+    tick++;
+    const progress = tick / totalTicks;
+    const eased = progress * progress * progress; // ease-in cubic: stays fast, then slows hard near the end
+    const delay = startDelay + eased * (endDelay - startDelay);
+    nameEl.style.animationDuration = Math.max(40, delay * 0.9) + 'ms';
+    setTimeout(nextTick, delay);
+  }
+  nextTick();
   document.getElementById('respin-btn').addEventListener('click', onRespin);
   document.getElementById('confirm-btn').addEventListener('click', onConfirm);
 }
