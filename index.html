@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1f2a24">
+<title>Where To</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1f2a24; --bg-raised:#26332c; --butter:#e8b23d; --cream:#f2ecdd;
+    --cream-dim:#c9c2ae; --rust:#b5482f; --sage:#7a8f72; --line: rgba(242,236,221,0.14);
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0; background:var(--bg); color:var(--cream); font-family:'Work Sans', system-ui, sans-serif; -webkit-font-smoothing:antialiased; overscroll-behavior-y:contain;}
+  .app{max-width:480px; margin:0 auto; min-height:100vh; padding: max(20px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); display:flex; flex-direction:column;}
+  h1,h2,h3{font-family:'Fraunces', Georgia, serif; font-weight:600; margin:0 0 4px; letter-spacing:-0.01em;}
+  h1{font-size:28px; font-variation-settings:'opsz' 40;}
+  h2{font-size:19px; font-variation-settings:'opsz' 24;}
+  h3{font-size:15.5px; font-variation-settings:'opsz' 18;}
+  .sub{color:var(--cream-dim); font-size:13.5px; margin:0 0 18px; line-height:1.45;}
+  .tabs{display:flex; gap:2px; background:var(--bg-raised); border-radius:999px; padding:3px; margin-bottom:22px;}
+  .tab{flex:1; text-align:center; padding:9px 4px; border-radius:999px; font-size:13px; font-weight:500; color:var(--cream-dim); cursor:pointer; user-select:none; transition:background .2s, color .2s;}
+  .tab.active{background:var(--butter); color:#1f2a24;}
+  .screen{display:none; flex:1; flex-direction:column;}
+  .screen.active{display:flex;}
+  .card{background:var(--bg-raised); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .place-name{font-size:16px; font-weight:500;}
+  .place-meta{font-size:12.5px; color:var(--cream-dim); margin-top:3px; display:flex; gap:8px; flex-wrap:wrap;}
+  .chip{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--line); font-size:11.5px; color:var(--cream-dim);}
+  button{font-family:inherit; border:none; cursor:pointer; background:none; color:inherit;}
+  .btn{background:var(--butter); color:#1f2a24; font-weight:600; font-size:15px; padding:13px 18px; border-radius:var(--radius); width:100%; text-align:center;}
+  .btn:active{opacity:0.85;}
+  .btn:disabled{opacity:0.45; pointer-events:none;}
+  .btn.ghost{background:transparent; border:1px solid var(--line); color:var(--cream); font-weight:500;}
+  .btn.small{width:auto; padding:9px 14px; font-size:13px;}
+  .btn.danger{background:transparent; color:var(--rust); border:1px solid rgba(181,72,47,0.4);}
+  input, select{font-family:inherit; font-size:15px; background:var(--bg); border:1px solid var(--line); color:var(--cream); border-radius:8px; padding:11px 12px; width:100%;}
+  input::placeholder{color:var(--cream-dim);}
+  .field{margin-bottom:10px;}
+  .field label{display:block; font-size:12.5px; color:var(--cream-dim); margin-bottom:5px;}
+  .field-row{display:flex; gap:8px; align-items:flex-end;}
+  .field-row .field{flex:1; margin-bottom:10px;}
+  .icon-btn{width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; border:1px solid var(--line); color:var(--cream-dim); flex-shrink:0;}
+  .icon-btn.remove:active{background:rgba(181,72,47,0.2); color:var(--rust);}
+  .empty{text-align:center; color:var(--cream-dim); font-size:14px; padding:36px 20px; line-height:1.6;}
+  .divider{border:0; border-top:1px solid var(--line); margin:20px 0;}
+  .status{font-size:12.5px; color:var(--sage); margin-top:6px; line-height:1.4;}
+  .status.error{color:var(--rust);}
+  .settings-toggle{font-size:13px; color:var(--cream-dim); text-decoration:underline; text-underline-offset:2px; margin-bottom:14px; display:inline-block;}
+  .edit-form{margin-top:10px; padding-top:10px; border-top:1px solid var(--line);}
+  .checklist-item{display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--line);}
+  .checklist-item:last-child{border-bottom:none;}
+  .checklist-item input[type=checkbox]{width:auto; margin-top:3px; accent-color:var(--sage);}
+  .checklist-item select{width:auto; font-size:12.5px; padding:5px 8px; margin-top:6px;}
+
+  .people-list{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
+  .person-pill{padding:8px 14px; border-radius:999px; border:1px solid var(--line); background:var(--bg-raised); color:var(--cream); font-weight:500; font-size:14px; display:flex; align-items:center; gap:6px;}
+  .person-pill.selected{background:var(--sage); border-color:var(--sage); color:#1f2a24; font-weight:500;}
+
+  .voter-block{margin-bottom:18px;}
+  .voter-name{font-size:14px; font-weight:600; color:var(--butter); margin-bottom:8px;}
+  .vote-row{display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line);}
+  .vote-row:last-child{border-bottom:none;}
+  .vote-controls{display:flex; gap:6px; flex-shrink:0;}
+  .vbtn{width:34px; height:34px; border-radius:8px; border:1px solid var(--line); font-size:14px; display:flex; align-items:center; justify-content:center;}
+  .vbtn.vote-on{background:var(--sage); border-color:var(--sage); color:#1f2a24;}
+  .vbtn.veto-on{background:var(--rust); border-color:var(--rust); color:var(--cream);}
+
+  .spin-stage{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px 0;}
+  .ticket{background:var(--bg-raised); border:1px dashed var(--butter); border-radius:14px; padding:32px 24px; width:100%; position:relative;}
+  .ticket .label{font-size:12px; letter-spacing:0.02em; color:var(--cream-dim); margin-bottom:10px;}
+  .ticket .winner-name{font-family:'Fraunces', serif; font-size:30px; font-weight:600; line-height:1.2; min-height:74px; display:flex; align-items:center; justify-content:center; font-variation-settings:'opsz' 40;}
+  .winner-meta{color:var(--cream-dim); font-size:13.5px; margin-top:8px;}
+  .spin-actions{width:100%; margin-top:22px; display:flex; flex-direction:column; gap:10px;}
+  @keyframes flicker{0%{opacity:0.3; transform:translateY(2px);} 50%{opacity:1; transform:translateY(0);} 100%{opacity:0.3; transform:translateY(2px);}}
+  .spinning{animation:flicker .09s infinite;}
+  .spinner-dot{display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--butter); margin:0 3px; animation:flicker .5s infinite;}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Where To</h1>
+  <p class="sub">Vote, veto, spin. No more circling for twenty minutes.</p>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="round">Tonight</div>
+    <div class="tab" data-tab="places">Spots</div>
+    <div class="tab" data-tab="people">People</div>
+  </div>
+
+  <div class="screen active" id="screen-round"><div id="round-body"></div></div>
+
+  <div class="screen" id="screen-places">
+    <div id="places-tab-body"></div>
+  </div>
+
+  <div class="screen" id="screen-people">
+    <h2>People</h2>
+    <p class="sub">Whoever might vote on any given night.</p>
+    <div id="people-manage-list"></div>
+    <div class="field" style="margin-top:16px;">
+      <label>Add a person</label>
+      <div class="field-row">
+        <input id="person-name" placeholder="Name">
+        <button class="btn small" id="add-person-btn">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'where-to-v3';
+
+function loadState(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(raw){ try { return migrate(JSON.parse(raw)); } catch(e){} }
+  return {
+    places: [
+      { id: uid(), name: 'Mesa Taqueria', distance: 12, price: 2, health: 'moderate', lastVisited: null },
+      { id: uid(), name: 'Green Bowl Kitchen', distance: 9, price: 1, health: 'light', lastVisited: null },
+      { id: uid(), name: "Otto's Fish Camp", distance: 22, price: 3, health: 'light', lastVisited: null },
+      { id: uid(), name: 'Pinewood BBQ', distance: 15, price: 2, health: 'indulgent', lastVisited: null },
+      { id: uid(), name: 'Corner Pizza Co.', distance: 6, price: 1, health: 'indulgent', lastVisited: null }
+    ],
+    people: [],
+    settings: { homeLabel:'', homeLat:null, homeLng:null, apiKey:'', radiusMiles: 8 },
+    round: { selectedPeople: [], votes: {}, vetoes: {} }
+  };
+}
+function migrate(s){
+  if(!s.settings) s.settings = { homeLabel:'', homeLat:null, homeLng:null, apiKey:'', radiusMiles: 8 };
+  return s;
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+let state = loadState();
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function escapeHtml(str){ return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---------- Tabs ----------
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('screen-' + tab.dataset.tab).classList.add('active');
+    if(tab.dataset.tab === 'round') renderRound();
+    if(tab.dataset.tab === 'places') renderPlacesTab();
+    if(tab.dataset.tab === 'people') renderPeopleManage();
+  });
+});
+
+// ---------- Google Maps loading ----------
+let gmapsLoadingPromise = null;
+function loadGoogleMaps(apiKey){
+  if(window.google && window.google.maps && window.google.maps.places) return Promise.resolve();
+  if(gmapsLoadingPromise) return gmapsLoadingPromise;
+  gmapsLoadingPromise = new Promise((resolve, reject)=>{
+    window.__gmapsReady = () => resolve();
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&callback=__gmapsReady`;
+    script.onerror = () => { gmapsLoadingPromise = null; reject(new Error('Could not load Google Maps — check the API key.')); };
+    document.head.appendChild(script);
+  });
+  return gmapsLoadingPromise;
+}
+function geocodeAddress(address){
+  return new Promise((resolve, reject)=>{
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ address }, (results, status)=>{
+      if(status === 'OK' && results[0]){
+        const loc = results[0].geometry.location;
+        resolve({ lat: loc.lat(), lng: loc.lng(), formatted: results[0].formatted_address });
+      } else {
+        reject(new Error('Could not locate that address (status: ' + status + ')'));
+      }
+    });
+  });
+}
+let placesService = null;
+function getPlacesService(){
+  if(!placesService) placesService = new google.maps.places.PlacesService(document.createElement('div'));
+  return placesService;
+}
+function nearbySearchAll(lat, lng, radiusMeters){
+  return new Promise((resolve, reject)=>{
+    const service = getPlacesService();
+    let all = [];
+    function handlePage(results, status, pagination){
+      if(status === 'OK'){ all = all.concat(results); }
+      else if(status !== 'ZERO_RESULTS'){ reject(new Error('Search failed (status: ' + status + ')')); return; }
+      if(pagination && pagination.hasNextPage && all.length < 60){
+        setTimeout(()=>pagination.nextPage(), 2000);
+      } else {
+        resolve(all);
+      }
+    }
+    service.nearbySearch({ location: { lat, lng }, radius: radiusMeters, type: 'restaurant' }, handlePage);
+  });
+}
+function findPlaceByName(query){
+  return new Promise((resolve, reject)=>{
+    const service = getPlacesService();
+    service.findPlaceFromQuery({
+      query,
+      fields: ['name','formatted_address','geometry','price_level','types']
+    }, (results, status)=>{
+      if(status === 'OK' && results[0]) resolve(results[0]);
+      else reject(new Error('No match found (status: ' + status + ')'));
+    });
+  });
+}
+
+// ---------- Distance / guessing helpers ----------
+function haversineMiles(lat1, lng1, lat2, lng2){
+  const R = 3958.8;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function estimateMinutes(miles){
+  // rough: assumes a mix of surface roads, ~30mph average, plus a small base for parking/lights
+  return Math.max(4, Math.round((miles / 30) * 60 + 3));
+}
+function mapPriceLevel(level){
+  if(level === undefined || level === null) return 2;
+  if(level <= 1) return 1;
+  if(level === 2) return 2;
+  return 3;
+}
+function guessHealth(name, types){
+  const text = (name + ' ' + (types||[]).join(' ')).toLowerCase();
+  const light = ['sushi','salad','poke','vegan','vegetarian','juice','smoothie','mediterranean','seafood','sashimi'];
+  const indulgent = ['bbq','barbecue','steak','pizza','burger','fried','buffet','ice_cream','bakery','donut','wing','fast_food'];
+  if(light.some(k=>text.includes(k))) return 'light';
+  if(indulgent.some(k=>text.includes(k))) return 'indulgent';
+  return 'moderate';
+}
+
+// ---------- Places tab (settings + list + import + manual add) ----------
+let showSettings = false;
+let importResults = null; // {results: [...], checked:Set}
+let importStatus = '';
+let importLoading = false;
+
+function renderPlacesTab(){
+  const el = document.getElementById('places-tab-body');
+  const s = state.settings;
+
+  let html = `<h2>Spots</h2><p class="sub">Everything in the running.</p><div id="places-list-mount"></div>`;
+
+  html += `<hr class="divider">`;
+  html += `<span class="settings-toggle" id="toggle-settings">${showSettings ? 'Hide' : 'Set up'} home base &amp; Google import ${showSettings ? '&#9650;' : '&#9660;'}</span>`;
+
+  if(showSettings){
+    html += `
+      <div class="card">
+        <h3>Home base</h3>
+        <p class="sub" style="margin-bottom:12px;">Distances are calculated from here, not your current location.</p>
+        <div class="field">
+          <label>Home address or zip</label>
+          <input id="home-address" placeholder="e.g. 12345 or 123 Main St, Montgomery, TX" value="${escapeHtml(s.homeLabel)}">
+        </div>
+        <div class="field">
+          <label>Google Maps API key</label>
+          <input id="api-key" type="password" placeholder="AIza..." value="${escapeHtml(s.apiKey)}">
+        </div>
+        <button class="btn" id="save-home-btn">Save &amp; locate</button>
+        <div class="status" id="home-status">${s.homeLat ? `Located: ${escapeHtml(s.homeLabel)}` : ''}</div>
+      </div>
+
+      <div class="card">
+        <h3>Import restaurants near home</h3>
+        <div class="field" style="margin-top:10px;">
+          <label>Search radius (miles)</label>
+          <input id="radius-miles" type="number" inputmode="numeric" value="${s.radiusMiles}">
+        </div>
+        <button class="btn ghost" id="find-nearby-btn">Find restaurants</button>
+        <div class="status ${importStatus.startsWith('Error') ? 'error':''}" id="import-status">${importStatus}</div>
+        <div id="import-results-mount"></div>
+      </div>
+    `;
+  }
+
+  html += `<hr class="divider"><h2>Add a spot</h2>`;
+  html += `
+    <div class="field">
+      <label>Name</label>
+      <div class="field-row">
+        <input id="p-name" placeholder="e.g. Otto's Fish Camp">
+        <button class="btn small ghost" id="lookup-btn">Look up</button>
+      </div>
+      <div class="status ${'lookupError' in window && window.lookupError ? 'error':''}" id="lookup-status"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Drive (minutes)</label><input id="p-distance" type="number" inputmode="numeric" placeholder="15"></div>
+      <div class="field"><label>Price</label>
+        <select id="p-price"><option value="1">$</option><option value="2" selected>$$</option><option value="3">$$$</option></select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Health profile</label>
+      <select id="p-health"><option value="light">Light</option><option value="moderate" selected>Moderate</option><option value="indulgent">Indulgent</option></select>
+    </div>
+    <button class="btn" id="add-place-btn">Add spot</button>
+  `;
+
+  el.innerHTML = html;
+  renderPlacesList();
+  attachPlacesTabHandlers();
+  if(showSettings) renderImportResults();
+}
+
+function renderPlacesList(){
+  const mount = document.getElementById('places-list-mount');
+  if(!mount) return;
+  if(state.places.length === 0){
+    mount.innerHTML = '<div class="empty">No spots yet. Add one below, or set up the Google import.</div>';
+    return;
+  }
+  mount.innerHTML = state.places.map(p=>{
+    const lastVisited = p.lastVisited ? daysAgoLabel(p.lastVisited) : 'Never logged';
+    const healthLabel = {light:'Light', moderate:'Moderate', indulgent:'Indulgent'}[p.health];
+    return `<div class="card" data-place-card="${p.id}">
+      <div class="row" data-expand-place="${p.id}" style="cursor:pointer;">
+        <div>
+          <div class="place-name">${escapeHtml(p.name)}</div>
+          <div class="place-meta">
+            <span class="chip">${p.distance} min</span>
+            <span class="chip">${'$'.repeat(p.price)}</span>
+            <span class="chip">${healthLabel}</span>
+            <span class="chip">${lastVisited}</span>
+          </div>
+        </div>
+        <button class="icon-btn remove" data-remove-place="${p.id}">&times;</button>
+      </div>
+      ${p._editing ? `
+        <div class="edit-form">
+          <div class="field-row">
+            <div class="field"><label>Drive (minutes)</label><input type="number" class="edit-distance" data-edit-id="${p.id}" value="${p.distance}"></div>
+            <div class="field"><label>Price</label>
+              <select class="edit-price" data-edit-id="${p.id}">
+                <option value="1" ${p.price==1?'selected':''}>$</option>
+                <option value="2" ${p.price==2?'selected':''}>$$</option>
+                <option value="3" ${p.price==3?'selected':''}>$$$</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Health profile</label>
+            <select class="edit-health" data-edit-id="${p.id}">
+              <option value="light" ${p.health==='light'?'selected':''}>Light</option>
+              <option value="moderate" ${p.health==='moderate'?'selected':''}>Moderate</option>
+              <option value="indulgent" ${p.health==='indulgent'?'selected':''}>Indulgent</option>
+            </select>
+          </div>
+          <button class="btn small" data-save-edit="${p.id}">Save</button>
+        </div>
+      ` : ''}
+    </div>`;
+  }).join('');
+
+  mount.querySelectorAll('[data-remove-place]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      state.places = state.places.filter(p=>p.id !== btn.dataset.removePlace);
+      saveState(); renderPlacesList();
+    });
+  });
+  mount.querySelectorAll('[data-expand-place]').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const id = row.dataset.expandPlace;
+      const p = state.places.find(p=>p.id===id);
+      if(p) p._editing = !p._editing;
+      renderPlacesList();
+    });
+  });
+  mount.querySelectorAll('[data-save-edit]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const id = btn.dataset.saveEdit;
+      const p = state.places.find(p=>p.id===id);
+      if(!p) return;
+      const distEl = mount.querySelector(`.edit-distance[data-edit-id="${id}"]`);
+      const priceEl = mount.querySelector(`.edit-price[data-edit-id="${id}"]`);
+      const healthEl = mount.querySelector(`.edit-health[data-edit-id="${id}"]`);
+      p.distance = parseInt(distEl.value, 10) || p.distance;
+      p.price = parseInt(priceEl.value, 10);
+      p.health = healthEl.value;
+      p._editing = false;
+      saveState(); renderPlacesList();
+    });
+  });
+}
+
+function daysAgoLabel(iso){
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if(days <= 0) return 'Today';
+  if(days === 1) return '1 day ago';
+  if(days < 30) return days + ' days ago';
+  const months = Math.floor(days/30);
+  return months === 1 ? '1 month ago' : months + ' months ago';
+}
+
+function attachPlacesTabHandlers(){
+  const toggle = document.getElementById('toggle-settings');
+  if(toggle) toggle.addEventListener('click', ()=>{ showSettings = !showSettings; renderPlacesTab(); });
+
+  const saveHomeBtn = document.getElementById('save-home-btn');
+  if(saveHomeBtn) saveHomeBtn.addEventListener('click', async ()=>{
+    const address = document.getElementById('home-address').value.trim();
+    const apiKey = document.getElementById('api-key').value.trim();
+    const statusEl = document.getElementById('home-status');
+    if(!address || !apiKey){ statusEl.textContent = 'Enter both an address and an API key.'; statusEl.classList.add('error'); return; }
+    statusEl.classList.remove('error');
+    statusEl.textContent = 'Locating...';
+    try{
+      await loadGoogleMaps(apiKey);
+      const loc = await geocodeAddress(address);
+      state.settings.homeLabel = loc.formatted;
+      state.settings.homeLat = loc.lat;
+      state.settings.homeLng = loc.lng;
+      state.settings.apiKey = apiKey;
+      saveState();
+      statusEl.textContent = `Located: ${loc.formatted}`;
+    } catch(err){
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.classList.add('error');
+    }
+  });
+
+  const findNearbyBtn = document.getElementById('find-nearby-btn');
+  if(findNearbyBtn) findNearbyBtn.addEventListener('click', async ()=>{
+    const radiusInput = document.getElementById('radius-miles');
+    const radiusMiles = parseFloat(radiusInput.value) || 8;
+    state.settings.radiusMiles = radiusMiles;
+    saveState();
+    if(!state.settings.homeLat || !state.settings.apiKey){
+      importStatus = 'Error: save your home base above first.';
+      renderPlacesTab();
+      return;
+    }
+    importStatus = 'Searching nearby restaurants...';
+    importResults = null;
+    renderPlacesTab();
+    try{
+      await loadGoogleMaps(state.settings.apiKey);
+      const results = await nearbySearchAll(state.settings.homeLat, state.settings.homeLng, radiusMiles * 1609.34);
+      const existingNames = new Set(state.places.map(p=>p.name.toLowerCase()));
+      const filtered = results.filter(r => !existingNames.has((r.name||'').toLowerCase()));
+      importResults = {
+        results: filtered.map(r=>({
+          placeId: r.place_id,
+          name: r.name,
+          address: r.vicinity || '',
+          lat: r.geometry.location.lat(),
+          lng: r.geometry.location.lng(),
+          price: mapPriceLevel(r.price_level),
+          health: guessHealth(r.name, r.types),
+          checked: true
+        }))
+      };
+      importStatus = filtered.length === 0
+        ? 'No new restaurants found in range — try a wider radius.'
+        : `Found ${filtered.length} spot${filtered.length===1?'':'s'}. Uncheck any you don't want, then add.`;
+    } catch(err){
+      importStatus = 'Error: ' + err.message;
+    }
+    renderPlacesTab();
+  });
+
+  const lookupBtn = document.getElementById('lookup-btn');
+  if(lookupBtn) lookupBtn.addEventListener('click', async ()=>{
+    const nameEl = document.getElementById('p-name');
+    const statusEl = document.getElementById('lookup-status');
+    const name = nameEl.value.trim();
+    if(!name){ nameEl.focus(); return; }
+    if(!state.settings.apiKey || !state.settings.homeLat){
+      statusEl.textContent = 'Set up home base & API key above first.';
+      statusEl.classList.add('error');
+      return;
+    }
+    statusEl.classList.remove('error');
+    statusEl.textContent = 'Looking up...';
+    try{
+      await loadGoogleMaps(state.settings.apiKey);
+      const query = `${name} near ${state.settings.homeLabel}`;
+      const place = await findPlaceByName(query);
+      const lat = place.geometry.location.lat(), lng = place.geometry.location.lng();
+      const miles = haversineMiles(state.settings.homeLat, state.settings.homeLng, lat, lng);
+      document.getElementById('p-distance').value = estimateMinutes(miles);
+      document.getElementById('p-price').value = mapPriceLevel(place.price_level);
+      document.getElementById('p-health').value = guessHealth(place.name, place.types);
+      nameEl.value = place.name;
+      statusEl.textContent = `Matched: ${place.formatted_address}`;
+    } catch(err){
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.classList.add('error');
+    }
+  });
+
+  const addBtn = document.getElementById('add-place-btn');
+  if(addBtn) addBtn.addEventListener('click', ()=>{
+    const name = document.getElementById('p-name').value.trim();
+    const distance = parseInt(document.getElementById('p-distance').value, 10);
+    const price = parseInt(document.getElementById('p-price').value, 10);
+    const health = document.getElementById('p-health').value;
+    if(!name){ document.getElementById('p-name').focus(); return; }
+    state.places.push({ id: uid(), name, distance: isNaN(distance) ? 15 : distance, price, health, lastVisited: null });
+    saveState();
+    document.getElementById('p-name').value = '';
+    document.getElementById('p-distance').value = '';
+    document.getElementById('lookup-status').textContent = '';
+    renderPlacesList();
+  });
+}
+
+function renderImportResults(){
+  const mount = document.getElementById('import-results-mount');
+  if(!mount) return;
+  if(!importResults || importResults.results.length === 0){ mount.innerHTML = ''; return; }
+  const checkedCount = importResults.results.filter(r=>r.checked).length;
+  mount.innerHTML = `
+    <div style="margin-top:10px;">
+      ${importResults.results.map((r,i)=>`
+        <div class="checklist-item">
+          <input type="checkbox" data-import-check="${i}" ${r.checked?'checked':''}>
+          <div style="flex:1;">
+            <div class="place-name" style="font-size:14.5px;">${escapeHtml(r.name)}</div>
+            <div class="place-meta">${escapeHtml(r.address)} &middot; ${'$'.repeat(r.price)}</div>
+            <select data-import-health="${i}">
+              <option value="light" ${r.health==='light'?'selected':''}>Light</option>
+              <option value="moderate" ${r.health==='moderate'?'selected':''}>Moderate</option>
+              <option value="indulgent" ${r.health==='indulgent'?'selected':''}>Indulgent</option>
+            </select>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <button class="btn" id="add-checked-btn" style="margin-top:12px;">Add ${checkedCount} spot${checkedCount===1?'':'s'}</button>
+  `;
+  mount.querySelectorAll('[data-import-check]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      importResults.results[parseInt(cb.dataset.importCheck,10)].checked = cb.checked;
+      renderImportResults();
+    });
+  });
+  mount.querySelectorAll('[data-import-health]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      importResults.results[parseInt(sel.dataset.importHealth,10)].health = sel.value;
+    });
+  });
+  const addCheckedBtn = document.getElementById('add-checked-btn');
+  if(addCheckedBtn) addCheckedBtn.addEventListener('click', ()=>{
+    importResults.results.filter(r=>r.checked).forEach(r=>{
+      const miles = haversineMiles(state.settings.homeLat, state.settings.homeLng, r.lat, r.lng);
+      state.places.push({
+        id: uid(), name: r.name, distance: estimateMinutes(miles),
+        price: r.price, health: r.health, lastVisited: null
+      });
+    });
+    importResults = null;
+    importStatus = 'Added to your list.';
+    saveState();
+    renderPlacesTab();
+  });
+}
+
+// ---------- People ----------
+function renderPeopleManage(){
+  const list = document.getElementById('people-manage-list');
+  if(state.people.length === 0){ list.innerHTML = '<div class="empty">No people yet. Add whoever might vote on a given night.</div>'; return; }
+  list.innerHTML = state.people.map(person=>`
+    <div class="card row">
+      <div class="place-name">${escapeHtml(person.name)}</div>
+      <button class="icon-btn remove" data-remove-person="${person.id}">&times;</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('[data-remove-person]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.people = state.people.filter(p=>p.id !== btn.dataset.removePerson);
+      state.round.selectedPeople = state.round.selectedPeople.filter(id=>id!==btn.dataset.removePerson);
+      delete state.round.votes[btn.dataset.removePerson];
+      delete state.round.vetoes[btn.dataset.removePerson];
+      saveState(); renderPeopleManage();
+    });
+  });
+}
+document.getElementById('add-person-btn').addEventListener('click', ()=>{
+  const input = document.getElementById('person-name');
+  const name = input.value.trim();
+  if(!name) return;
+  state.people.push({id: uid(), name});
+  saveState();
+  input.value = '';
+  renderPeopleManage();
+});
+
+// ---------- Round ----------
+function renderRound(){
+  const body = document.getElementById('round-body');
+  if(state.places.length < 2){ body.innerHTML = '<div class="empty">Add at least two spots on the Spots tab before starting a round.</div>'; return; }
+  if(state.people.length === 0){ body.innerHTML = '<div class="empty">Add people on the People tab so they can vote.</div>'; return; }
+
+  const sel = state.round.selectedPeople;
+  let html = `<h2>Who's in tonight?</h2><p class="sub">Tap everyone voting this round.</p><div class="people-list">`;
+  state.people.forEach(p=>{
+    const isSel = sel.includes(p.id);
+    html += `<div class="person-pill ${isSel?'selected':''}" data-toggle-person="${p.id}">${escapeHtml(p.name)}</div>`;
+  });
+  html += `</div>`;
+
+  if(sel.length === 0){
+    html += `<div class="empty">Pick at least one person to start voting.</div>`;
+    body.innerHTML = html;
+    attachPersonToggles();
+    return;
+  }
+
+  html += `<hr class="divider"><h2>Votes &amp; vetoes</h2><p class="sub">Two votes and one veto each, none required.</p>`;
+  sel.forEach(personId=>{
+    const person = state.people.find(p=>p.id===personId);
+    if(!person) return;
+    const votes = state.round.votes[personId] || [];
+    const veto = state.round.vetoes[personId];
+    html += `<div class="voter-block"><div class="voter-name">${escapeHtml(person.name)}</div>`;
+    state.places.forEach(place=>{
+      const voteOn = votes.includes(place.id);
+      const vetoOn = veto === place.id;
+      html += `<div class="vote-row">
+        <div>${escapeHtml(place.name)}</div>
+        <div class="vote-controls">
+          <button class="vbtn ${voteOn?'vote-on':''}" data-vote-person="${personId}" data-vote-place="${place.id}" title="Vote">&#9733;</button>
+          <button class="vbtn ${vetoOn?'veto-on':''}" data-veto-person="${personId}" data-veto-place="${place.id}" title="Veto">&#10005;</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  html += `<button class="btn" id="spin-btn" style="margin-top:8px;">Spin</button>`;
+  body.innerHTML = html;
+  attachPersonToggles();
+  attachVoteHandlers();
+  document.getElementById('spin-btn').addEventListener('click', doSpin);
+}
+
+function attachPersonToggles(){
+  document.querySelectorAll('[data-toggle-person]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.dataset.togglePerson;
+      const idx = state.round.selectedPeople.indexOf(id);
+      if(idx === -1) state.round.selectedPeople.push(id);
+      else state.round.selectedPeople.splice(idx,1);
+      saveState(); renderRound();
+    });
+  });
+}
+function attachVoteHandlers(){
+  document.querySelectorAll('[data-vote-person]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const pid = btn.dataset.votePerson, placeId = btn.dataset.votePlace;
+      const votes = state.round.votes[pid] || [];
+      const idx = votes.indexOf(placeId);
+      if(idx !== -1){ votes.splice(idx,1); }
+      else { if(votes.length >= 2) votes.shift(); votes.push(placeId); }
+      state.round.votes[pid] = votes;
+      if(state.round.vetoes[pid] === placeId) delete state.round.vetoes[pid];
+      saveState(); renderRound();
+    });
+  });
+  document.querySelectorAll('[data-veto-person]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const pid = btn.dataset.vetoPerson, placeId = btn.dataset.vetoPlace;
+      if(state.round.vetoes[pid] === placeId){ delete state.round.vetoes[pid]; }
+      else {
+        state.round.vetoes[pid] = placeId;
+        const votes = state.round.votes[pid] || [];
+        const idx = votes.indexOf(placeId);
+        if(idx !== -1) votes.splice(idx,1);
+        state.round.votes[pid] = votes;
+      }
+      saveState(); renderRound();
+    });
+  });
+}
+
+// ---------- Weighting & Spin ----------
+function computeWeights(){
+  const vetoedIds = new Set(Object.values(state.round.vetoes));
+  const voteCounts = {};
+  Object.values(state.round.votes).forEach(list=>{ list.forEach(placeId=>{ voteCounts[placeId] = (voteCounts[placeId]||0) + 1; }); });
+  const candidates = state.places.filter(p=>!vetoedIds.has(p.id));
+  return candidates.map(place=>{
+    let weight = 1;
+    weight += (voteCounts[place.id] || 0) * 4;
+    if(place.lastVisited){
+      const days = Math.floor((Date.now() - new Date(place.lastVisited).getTime()) / 86400000);
+      if(days < 7) weight *= 0.15;
+      else if(days < 21) weight *= 0.55;
+      else if(days > 60) weight *= 1.6;
+    } else { weight *= 1.7; }
+    weight *= Math.max(0.5, 1.3 - (place.distance / 60));
+    weight *= ({light:1.12, moderate:1.0, indulgent:0.92})[place.health] ?? 1.0;
+    weight *= ({1:1.05, 2:1.0, 3:0.95})[place.price] ?? 1.0;
+    return { place, weight: Math.max(weight, 0.05) };
+  });
+}
+function weightedPick(weighted){
+  const total = weighted.reduce((s,w)=>s+w.weight, 0);
+  let r = Math.random() * total;
+  for(const w of weighted){ r -= w.weight; if(r <= 0) return w.place; }
+  return weighted[weighted.length-1].place;
+}
+function doSpin(){
+  const weighted = computeWeights();
+  if(weighted.length === 0){ alert("Everything's been vetoed — free up at least one spot."); return; }
+  const winner = weightedPick(weighted);
+  const body = document.getElementById('round-body');
+  body.innerHTML = `
+    <div class="spin-stage">
+      <div class="ticket">
+        <div class="label">tonight, you're eating at</div>
+        <div class="winner-name spinning" id="winner-name">...</div>
+        <div class="winner-meta" id="winner-meta"></div>
+      </div>
+      <div class="spin-actions">
+        <button class="btn ghost" id="respin-btn">Spin again</button>
+        <button class="btn" id="confirm-btn">Lock it in</button>
+      </div>
+    </div>
+  `;
+  const nameEl = document.getElementById('winner-name');
+  const names = state.places.map(p=>p.name);
+  let ticks = 0;
+  const maxTicks = 16;
+  const interval = setInterval(()=>{
+    nameEl.textContent = names[Math.floor(Math.random()*names.length)];
+    ticks++;
+    if(ticks >= maxTicks){
+      clearInterval(interval);
+      nameEl.classList.remove('spinning');
+      nameEl.textContent = winner.name;
+      document.getElementById('winner-meta').textContent = `${winner.distance} min away · ${'$'.repeat(winner.price)} · ${winner.health}`;
+    }
+  }, 80);
+  document.getElementById('respin-btn').addEventListener('click', doSpin);
+  document.getElementById('confirm-btn').addEventListener('click', ()=>{
+    const p = state.places.find(p=>p.id === winner.id);
+    if(p) p.lastVisited = new Date().toISOString();
+    state.round.votes = {};
+    state.round.vetoes = {};
+    saveState();
+    renderRound();
+  });
+}
+
+// ---------- Init ----------
+renderRound();
+renderPlacesTab();
+renderPeopleManage();
+</script>
+</body>
+</html>
