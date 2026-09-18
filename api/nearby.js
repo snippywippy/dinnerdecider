@@ -12,6 +12,10 @@ const EXCLUDED_NAME_KEYWORDS = [
   "churchs chicken", "raising cane's", "raising canes", "zaxby's", "zaxbys", "del taco",
   "in-n-out", "checkers", "rally's", "rallys", "long john silver's", "long john silvers",
   "captain d's", "captain ds", "subway",
+  // fried chicken (beyond the fast-food chains above)
+  "hartz chicken", "hartz chicken buffet",
+  // ice cream / soft-serve chains
+  "dairy queen", "dq grill", "dq grill & chill",
   // donut shops (chains and the category in general)
   "dunkin", "krispy kreme", "donut", "doughnut",
   // coffee shops (chains and the category in general)
