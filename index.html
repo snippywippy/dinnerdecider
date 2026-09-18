@@ -118,6 +118,7 @@
   <img src="/couple-sprite.png" alt="" class="hero-sprite">
   <h1 style="text-align:center;">Dinner Decider</h1>
   <p class="sub">Vote, veto, spin. No more circling for twenty minutes.</p>
+  <button class="btn ghost small" id="refresh-app-btn" style="align-self:center; margin-bottom:16px;">&#8635; Refresh app</button>
 
   <div class="tabs">
     <div class="tab active" data-tab="round">Tonight</div>
@@ -914,6 +915,12 @@ async function doSpin(){
     renderRound();
   });
 }
+
+// ---------- Refresh app (force a fresh copy past any cached version) ----------
+const refreshAppBtn = document.getElementById('refresh-app-btn');
+if(refreshAppBtn) refreshAppBtn.addEventListener('click', ()=>{
+  window.location.href = window.location.pathname + '?_=' + Date.now();
+});
 
 // ---------- Init ----------
 renderRound();
