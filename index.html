@@ -63,9 +63,11 @@
   .icon-btn{width:30px; height:30px; border-radius:0; display:flex; align-items:center; justify-content:center; font-size:16px; border:2px solid var(--ink); color:var(--ink); background:var(--bg-raised); flex-shrink:0;}
   .icon-btn.remove:active{background:var(--rust); color:var(--cream);}
   .empty{text-align:center; color:var(--ink-dim); font-size:16px; padding:36px 20px; line-height:1.6;}
-  .maplink{display:inline-block; font-size:13px; color:var(--sage); text-decoration:underline; margin-top:6px;}
+  .maplink{display:inline-block; font-size:13px; color:#1a73e8; text-decoration:underline; margin-top:6px;}
   .drive-cat-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
   .drive-cat-cluster{display:flex; align-items:center; gap:8px; flex-shrink:0;}
+  .spot-name-col{flex:1; text-align:center; min-width:0;}
+  .spot-name-col .place-name{font-size:19px;}
   .drive-time-lg{font-family:'Press Start 2P', monospace; font-size:15px; color:var(--ink); text-align:right; line-height:1.35;}
   .drive-time-lg .drive-time-unit{display:block; font-size:8px; color:var(--ink-dim); margin-top:2px; letter-spacing:0.03em;}
   .cat-badge{width:68px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; border:3px solid var(--ink); background:var(--cream-dim); padding:5px 3px; box-shadow:var(--shadow-sm);}
@@ -443,18 +445,14 @@ function renderPlacesList(){
   mount.innerHTML = sorted.map(p=>{
     const lastVisited = p.lastVisited ? daysAgoLabel(p.lastVisited) : 'Never logged';
     return `<div class="card" data-place-card="${p.id}">
-      <div class="row" data-expand-place="${p.id}" style="cursor:pointer; align-items:flex-start;">
-        <div class="drive-cat-row" style="flex:1;">
-          <div>
-            <div class="place-name">${escapeHtml(p.name)}</div>
-            <div class="place-meta"><span class="chip">${lastVisited}</span></div>
-            ${p.placeId ? `<a class="maplink" href="${mapsLinkForPlace(p)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
-          </div>
-          <div class="drive-cat-cluster">
-            <div class="drive-time-lg">${p.distance}<span class="drive-time-unit">min</span></div>
-            ${categoryBadge(guessCategory(p.name))}
-          </div>
+      <div class="row" data-expand-place="${p.id}" style="cursor:pointer; align-items:center;">
+        <div class="drive-time-lg">${p.distance}<span class="drive-time-unit">min</span></div>
+        <div class="spot-name-col">
+          <div class="place-name">${escapeHtml(p.name)}</div>
+          <div class="place-meta" style="justify-content:center;"><span class="chip">${lastVisited}</span></div>
+          ${p.placeId ? `<a class="maplink" href="${mapsLinkForPlace(p)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
         </div>
+        ${categoryBadge(guessCategory(p.name))}
         <button class="icon-btn remove" data-remove-place="${p.id}">&times;</button>
       </div>
       ${p._editing ? `
@@ -620,16 +618,12 @@ function renderImportResults(){
       ${importResults.results.map((r,i)=>`
         <div class="checklist-item">
           <input type="checkbox" data-import-check="${i}" ${r.checked?'checked':''}>
-          <div class="drive-cat-row" style="flex:1;">
-            <div>
-              <div class="place-name" style="font-size:14.5px;">${escapeHtml(r.name)}</div>
-              ${r.placeId ? `<a class="maplink" href="${mapsLinkForPlace(r)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
-            </div>
-            <div class="drive-cat-cluster">
-              <div class="drive-time-lg">${r.distance}<span class="drive-time-unit">min</span></div>
-              ${categoryBadge(r.category)}
-            </div>
+          <div class="drive-time-lg">${r.distance}<span class="drive-time-unit">min</span></div>
+          <div class="spot-name-col">
+            <div class="place-name">${escapeHtml(r.name)}</div>
+            ${r.placeId ? `<a class="maplink" href="${mapsLinkForPlace(r)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
           </div>
+          ${categoryBadge(r.category)}
         </div>
       `).join('')}
     </div>
