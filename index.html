@@ -362,7 +362,7 @@ async function findNearbyRestaurants(){
         mapped.sort((a,b)=>a.distance-b.distance);
         renderImportResults();
       } catch(err){
-        importStatus += ' (drive times unavailable — showing rough estimates)';
+        importStatus += ` (drive times unavailable: ${err.message} — showing rough estimates)`;
         renderPlacesTab();
       }
     }

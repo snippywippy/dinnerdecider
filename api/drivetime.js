@@ -24,7 +24,8 @@ module.exports = async function handler(req, res) {
       const r = await fetch(url);
       const data = await r.json();
       if (data.status !== 'OK') {
-        res.status(400).json({ error: `Distance Matrix failed (status: ${data.status})` });
+        const detail = data.error_message ? ` — ${data.error_message}` : '';
+        res.status(400).json({ error: `${data.status}${detail}` });
         return;
       }
       const elements = (data.rows && data.rows[0] && data.rows[0].elements) || [];
@@ -34,6 +35,8 @@ module.exports = async function handler(req, res) {
             minutes: Math.round(el.duration.value / 60),
             miles: Math.round((el.distance.value / 1609.34) * 10) / 10
           };
+        } else if (el.status && el.status !== 'ZERO_RESULTS') {
+          // leave as null but don't fail the whole batch over one bad element
         }
       });
     }
