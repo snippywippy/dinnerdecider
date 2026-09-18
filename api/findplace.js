@@ -1,0 +1,33 @@
+module.exports = async function handler(req, res) {
+  const query = req.query.query;
+  if (!query) {
+    res.status(400).json({ error: 'Missing query' });
+    return;
+  }
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) {
+    res.status(500).json({ error: 'Server is missing GOOGLE_MAPS_API_KEY' });
+    return;
+  }
+  try {
+    const fields = 'name,formatted_address,geometry,price_level,types';
+    const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=${fields}&key=${key}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    if (data.status !== 'OK' || !data.candidates || !data.candidates[0]) {
+      res.status(400).json({ error: `No match found (status: ${data.status})` });
+      return;
+    }
+    const c = data.candidates[0];
+    res.status(200).json({
+      name: c.name,
+      formatted_address: c.formatted_address,
+      lat: c.geometry.location.lat,
+      lng: c.geometry.location.lng,
+      price_level: c.price_level,
+      types: c.types
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Find place failed: ' + err.message });
+  }
+};

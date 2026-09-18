@@ -131,12 +131,12 @@ function loadState(){
       { id: uid(), name: 'Corner Pizza Co.', distance: 6, price: 1, health: 'indulgent', lastVisited: null }
     ],
     people: [],
-    settings: { homeLabel:'', homeLat:null, homeLng:null, apiKey:'', radiusMiles: 8 },
+    settings: { homeLabel:'', homeLat:null, homeLng:null, radiusMiles: 8 },
     round: { selectedPeople: [], votes: {}, vetoes: {} }
   };
 }
 function migrate(s){
-  if(!s.settings) s.settings = { homeLabel:'', homeLat:null, homeLng:null, apiKey:'', radiusMiles: 8 };
+  if(!s.settings) s.settings = { homeLabel:'', homeLat:null, homeLng:null, radiusMiles: 8 };
   return s;
 }
 function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -157,65 +157,24 @@ document.querySelectorAll('.tab').forEach(tab=>{
   });
 });
 
-// ---------- Google Maps loading ----------
-let gmapsLoadingPromise = null;
-function loadGoogleMaps(apiKey){
-  if(window.google && window.google.maps && window.google.maps.places) return Promise.resolve();
-  if(gmapsLoadingPromise) return gmapsLoadingPromise;
-  gmapsLoadingPromise = new Promise((resolve, reject)=>{
-    window.__gmapsReady = () => resolve();
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&callback=__gmapsReady`;
-    script.onerror = () => { gmapsLoadingPromise = null; reject(new Error('Could not load Google Maps — check the API key.')); };
-    document.head.appendChild(script);
-  });
-  return gmapsLoadingPromise;
+// ---------- Server-side geocoding / places (API key lives on the server, never in the browser) ----------
+async function geocodeAddress(address){
+  const res = await fetch('/api/geocode?address=' + encodeURIComponent(address));
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error || 'Could not locate that address');
+  return data; // { lat, lng, formatted }
 }
-function geocodeAddress(address){
-  return new Promise((resolve, reject)=>{
-    const geocoder = new google.maps.Geocoder();
-    geocoder.geocode({ address }, (results, status)=>{
-      if(status === 'OK' && results[0]){
-        const loc = results[0].geometry.location;
-        resolve({ lat: loc.lat(), lng: loc.lng(), formatted: results[0].formatted_address });
-      } else {
-        reject(new Error('Could not locate that address (status: ' + status + ')'));
-      }
-    });
-  });
+async function nearbySearchAll(lat, lng, radiusMiles){
+  const res = await fetch(`/api/nearby?lat=${lat}&lng=${lng}&radiusMiles=${radiusMiles}`);
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error || 'Search failed');
+  return data.results; // array shaped like Google's Places REST response
 }
-let placesService = null;
-function getPlacesService(){
-  if(!placesService) placesService = new google.maps.places.PlacesService(document.createElement('div'));
-  return placesService;
-}
-function nearbySearchAll(lat, lng, radiusMeters){
-  return new Promise((resolve, reject)=>{
-    const service = getPlacesService();
-    let all = [];
-    function handlePage(results, status, pagination){
-      if(status === 'OK'){ all = all.concat(results); }
-      else if(status !== 'ZERO_RESULTS'){ reject(new Error('Search failed (status: ' + status + ')')); return; }
-      if(pagination && pagination.hasNextPage && all.length < 60){
-        setTimeout(()=>pagination.nextPage(), 2000);
-      } else {
-        resolve(all);
-      }
-    }
-    service.nearbySearch({ location: { lat, lng }, radius: radiusMeters, type: 'restaurant' }, handlePage);
-  });
-}
-function findPlaceByName(query){
-  return new Promise((resolve, reject)=>{
-    const service = getPlacesService();
-    service.findPlaceFromQuery({
-      query,
-      fields: ['name','formatted_address','geometry','price_level','types']
-    }, (results, status)=>{
-      if(status === 'OK' && results[0]) resolve(results[0]);
-      else reject(new Error('No match found (status: ' + status + ')'));
-    });
-  });
+async function findPlaceByName(query){
+  const res = await fetch('/api/findplace?query=' + encodeURIComponent(query));
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error || 'No match found');
+  return data; // { name, formatted_address, lat, lng, price_level, types }
 }
 
 // ---------- Distance / guessing helpers ----------
@@ -258,7 +217,7 @@ function renderPlacesTab(){
   let html = `<h2>Spots</h2><p class="sub">Everything in the running.</p><div id="places-list-mount"></div>`;
 
   html += `<hr class="divider">`;
-  html += `<span class="settings-toggle" id="toggle-settings">${showSettings ? 'Hide' : 'Set up'} home base &amp; Google import ${showSettings ? '&#9650;' : '&#9660;'}</span>`;
+  html += `<span class="settings-toggle" id="toggle-settings">${showSettings ? 'Hide' : 'Set up'} home base &amp; import ${showSettings ? '&#9650;' : '&#9660;'}</span>`;
 
   if(showSettings){
     html += `
@@ -268,10 +227,6 @@ function renderPlacesTab(){
         <div class="field">
           <label>Home address or zip</label>
           <input id="home-address" placeholder="e.g. 12345 or 123 Main St, Montgomery, TX" value="${escapeHtml(s.homeLabel)}">
-        </div>
-        <div class="field">
-          <label>Google Maps API key</label>
-          <input id="api-key" type="password" placeholder="AIza..." value="${escapeHtml(s.apiKey)}">
         </div>
         <button class="btn" id="save-home-btn">Save &amp; locate</button>
         <div class="status" id="home-status">${s.homeLat ? `Located: ${escapeHtml(s.homeLabel)}` : ''}</div>
@@ -298,7 +253,7 @@ function renderPlacesTab(){
         <input id="p-name" placeholder="e.g. Otto's Fish Camp">
         <button class="btn small ghost" id="lookup-btn">Look up</button>
       </div>
-      <div class="status ${'lookupError' in window && window.lookupError ? 'error':''}" id="lookup-status"></div>
+      <div class="status" id="lookup-status"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Drive (minutes)</label><input id="p-distance" type="number" inputmode="numeric" placeholder="15"></div>
@@ -323,7 +278,7 @@ function renderPlacesList(){
   const mount = document.getElementById('places-list-mount');
   if(!mount) return;
   if(state.places.length === 0){
-    mount.innerHTML = '<div class="empty">No spots yet. Add one below, or set up the Google import.</div>';
+    mount.innerHTML = '<div class="empty">No spots yet. Add one below, or set up the import.</div>';
     return;
   }
   mount.innerHTML = state.places.map(p=>{
@@ -417,18 +372,15 @@ function attachPlacesTabHandlers(){
   const saveHomeBtn = document.getElementById('save-home-btn');
   if(saveHomeBtn) saveHomeBtn.addEventListener('click', async ()=>{
     const address = document.getElementById('home-address').value.trim();
-    const apiKey = document.getElementById('api-key').value.trim();
     const statusEl = document.getElementById('home-status');
-    if(!address || !apiKey){ statusEl.textContent = 'Enter both an address and an API key.'; statusEl.classList.add('error'); return; }
+    if(!address){ statusEl.textContent = 'Enter an address.'; statusEl.classList.add('error'); return; }
     statusEl.classList.remove('error');
     statusEl.textContent = 'Locating...';
     try{
-      await loadGoogleMaps(apiKey);
       const loc = await geocodeAddress(address);
       state.settings.homeLabel = loc.formatted;
       state.settings.homeLat = loc.lat;
       state.settings.homeLng = loc.lng;
-      state.settings.apiKey = apiKey;
       saveState();
       statusEl.textContent = `Located: ${loc.formatted}`;
     } catch(err){
@@ -443,7 +395,7 @@ function attachPlacesTabHandlers(){
     const radiusMiles = parseFloat(radiusInput.value) || 8;
     state.settings.radiusMiles = radiusMiles;
     saveState();
-    if(!state.settings.homeLat || !state.settings.apiKey){
+    if(!state.settings.homeLat){
       importStatus = 'Error: save your home base above first.';
       renderPlacesTab();
       return;
@@ -452,8 +404,7 @@ function attachPlacesTabHandlers(){
     importResults = null;
     renderPlacesTab();
     try{
-      await loadGoogleMaps(state.settings.apiKey);
-      const results = await nearbySearchAll(state.settings.homeLat, state.settings.homeLng, radiusMiles * 1609.34);
+      const results = await nearbySearchAll(state.settings.homeLat, state.settings.homeLng, radiusMiles);
       const existingNames = new Set(state.places.map(p=>p.name.toLowerCase()));
       const filtered = results.filter(r => !existingNames.has((r.name||'').toLowerCase()));
       importResults = {
@@ -461,8 +412,8 @@ function attachPlacesTabHandlers(){
           placeId: r.place_id,
           name: r.name,
           address: r.vicinity || '',
-          lat: r.geometry.location.lat(),
-          lng: r.geometry.location.lng(),
+          lat: r.geometry.location.lat,
+          lng: r.geometry.location.lng,
           price: mapPriceLevel(r.price_level),
           health: guessHealth(r.name, r.types),
           checked: true
@@ -483,19 +434,17 @@ function attachPlacesTabHandlers(){
     const statusEl = document.getElementById('lookup-status');
     const name = nameEl.value.trim();
     if(!name){ nameEl.focus(); return; }
-    if(!state.settings.apiKey || !state.settings.homeLat){
-      statusEl.textContent = 'Set up home base & API key above first.';
+    if(!state.settings.homeLat){
+      statusEl.textContent = 'Set up home base above first.';
       statusEl.classList.add('error');
       return;
     }
     statusEl.classList.remove('error');
     statusEl.textContent = 'Looking up...';
     try{
-      await loadGoogleMaps(state.settings.apiKey);
       const query = `${name} near ${state.settings.homeLabel}`;
       const place = await findPlaceByName(query);
-      const lat = place.geometry.location.lat(), lng = place.geometry.location.lng();
-      const miles = haversineMiles(state.settings.homeLat, state.settings.homeLng, lat, lng);
+      const miles = haversineMiles(state.settings.homeLat, state.settings.homeLng, place.lat, place.lng);
       document.getElementById('p-distance').value = estimateMinutes(miles);
       document.getElementById('p-price').value = mapPriceLevel(place.price_level);
       document.getElementById('p-health').value = guessHealth(place.name, place.types);
