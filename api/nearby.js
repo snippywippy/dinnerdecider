@@ -11,7 +11,9 @@ const EXCLUDED_NAME_KEYWORDS = [
   "white castle", "whataburger", "bojangles", "culver's", "culvers", "church's chicken",
   "churchs chicken", "raising cane's", "raising canes", "zaxby's", "zaxbys", "del taco",
   "in-n-out", "checkers", "rally's", "rallys", "long john silver's", "long john silvers",
-  "captain d's", "captain ds",
+  "captain d's", "captain ds", "subway",
+  // donut shops (chains and the category in general)
+  "dunkin", "krispy kreme", "donut", "doughnut",
   // pizza franchises
   "domino's", "dominos", "pizza hut", "papa john's", "papa johns", "little caesars",
   "papa murphy's", "papa murphys", "marco's pizza", "marcos pizza", "jet's pizza",
