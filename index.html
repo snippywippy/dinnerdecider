@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#5C94FC">
-<title>Where To</title>
+<title>Dinner Decider</title>
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
@@ -105,7 +105,7 @@
 <body>
 <div class="app">
   <img src="/couple-sprite.png" alt="" class="hero-sprite">
-  <h1>Where To</h1>
+  <h1 style="text-align:center;">Dinner Decider</h1>
   <p class="sub">Vote, veto, spin. No more circling for twenty minutes.</p>
 
   <div class="tabs">
@@ -148,13 +148,16 @@ function loadState(){
       { id: uid(), name: 'Pinewood BBQ', distance: 15, price: 2, health: 'indulgent', lastVisited: null },
       { id: uid(), name: 'Corner Pizza Co.', distance: 6, price: 1, health: 'indulgent', lastVisited: null }
     ],
-    people: [],
+    people: [ { id: uid(), name: 'Austin' }, { id: uid(), name: 'Annahita' } ],
     settings: { homeLabel:'', homeLat:null, homeLng:null, radiusMiles: 8 },
     round: { selectedPeople: [], votes: {}, vetoes: {} }
   };
 }
 function migrate(s){
   if(!s.settings) s.settings = { homeLabel:'', homeLat:null, homeLng:null, radiusMiles: 8 };
+  if(!s.people || s.people.length === 0){
+    s.people = [ { id: uid(), name: 'Austin' }, { id: uid(), name: 'Annahita' } ];
+  }
   return s;
 }
 function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
