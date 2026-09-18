@@ -1,6 +1,7 @@
 // Real driving times/distances from home base to a batch of destinations,
-// via Google's Distance Matrix API. Falls back gracefully client-side if this
-// errors (e.g. the API isn't enabled yet on the key) — see fetchDriveTimes in index.html.
+// via Google's Routes API (computeRouteMatrix) — the current replacement for the
+// legacy Distance Matrix API, which Google no longer enables for new projects.
+// Falls back gracefully client-side if this errors — see fetchDriveTimes in index.html.
 module.exports = async function handler(req, res) {
   const { originLat, originLng, destinations } = req.query;
   if (!originLat || !originLng || !destinations) {
@@ -15,33 +16,51 @@ module.exports = async function handler(req, res) {
 
   const destList = destinations.split(';').filter(Boolean);
   const results = new Array(destList.length).fill(null);
+  const originPoint = {
+    waypoint: { location: { latLng: { latitude: parseFloat(originLat), longitude: parseFloat(originLng) } } }
+  };
 
   try {
-    // Distance Matrix caps out around 25 destinations per request; batch it.
+    // Route matrix caps out around 25 destinations per request (with 1 origin); batch it.
     for (let i = 0; i < destList.length; i += 25) {
       const batch = destList.slice(i, i + 25);
-      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(originLat + ',' + originLng)}&destinations=${encodeURIComponent(batch.join('|'))}&units=imperial&mode=driving&key=${key}`;
-      const r = await fetch(url);
+      const body = {
+        origins: [originPoint],
+        destinations: batch.map(d => {
+          const [lat, lng] = d.split(',').map(Number);
+          return { waypoint: { location: { latLng: { latitude: lat, longitude: lng } } } };
+        }),
+        travelMode: 'DRIVE',
+        routingPreference: 'TRAFFIC_UNAWARE'
+      };
+      const r = await fetch('https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': key,
+          'X-Goog-FieldMask': 'originIndex,destinationIndex,duration,distanceMeters,condition,status'
+        },
+        body: JSON.stringify(body)
+      });
       const data = await r.json();
-      if (data.status !== 'OK') {
-        const detail = data.error_message ? ` — ${data.error_message}` : '';
-        res.status(400).json({ error: `${data.status}${detail}` });
+      if (!r.ok) {
+        const msg = (data && data.error && data.error.message) || `HTTP ${r.status}`;
+        res.status(400).json({ error: msg });
         return;
       }
-      const elements = (data.rows && data.rows[0] && data.rows[0].elements) || [];
-      elements.forEach((el, j) => {
-        if (el.status === 'OK') {
-          results[i + j] = {
-            minutes: Math.round(el.duration.value / 60),
-            miles: Math.round((el.distance.value / 1609.34) * 10) / 10
+      (Array.isArray(data) ? data : []).forEach(el => {
+        const di = el.destinationIndex || 0;
+        if (el.condition === 'ROUTE_EXISTS' && el.duration && typeof el.distanceMeters === 'number') {
+          const seconds = parseInt(String(el.duration).replace('s', ''), 10);
+          results[i + di] = {
+            minutes: Math.round(seconds / 60),
+            miles: Math.round((el.distanceMeters / 1609.34) * 10) / 10
           };
-        } else if (el.status && el.status !== 'ZERO_RESULTS') {
-          // leave as null but don't fail the whole batch over one bad element
         }
       });
     }
     res.status(200).json({ results });
   } catch (err) {
-    res.status(500).json({ error: 'Distance matrix failed: ' + err.message });
+    res.status(500).json({ error: 'Route matrix failed: ' + err.message });
   }
 };
