@@ -98,15 +98,24 @@
   .vbtn.veto-on{background:var(--rust); border-color:var(--ink); color:var(--cream);}
 
   .spin-stage{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px 0;}
-  .ticket{background:var(--bg-raised); border:3px solid var(--ink); border-radius:0; padding:32px 22px; width:100%; position:relative; box-shadow:var(--shadow);}
-  .ticket::before{content:''; position:absolute; inset:8px; border:2px dashed var(--butter); pointer-events:none;}
-  .ticket .label{font-family:'Press Start 2P', monospace; font-size:10px; letter-spacing:0.02em; color:var(--ink-dim); margin-bottom:14px;}
-  .ticket .winner-name{font-family:'VT323', monospace; font-size:34px; font-weight:700; line-height:1.2; min-height:74px; display:flex; align-items:center; justify-content:center; color:var(--ink);}
-  .winner-meta{color:var(--ink-dim); font-size:16px; margin-top:10px;}
+  .slot-frame{background:linear-gradient(180deg,#3a0ca3,#20063b); border:4px solid var(--butter); border-radius:0; padding:14px; width:100%; box-shadow:0 0 0 4px var(--ink), 0 0 22px 5px rgba(251,208,0,0.55);}
+  .slot-lights{display:flex; justify-content:space-between; padding:0 2px 10px;}
+  .slot-light{width:9px; height:9px; border-radius:50%; background:var(--rust); box-shadow:0 0 6px 1px var(--rust); animation:marquee 1s infinite;}
+  .slot-light:nth-child(3n+1){background:var(--butter); box-shadow:0 0 6px 1px var(--butter); animation-delay:.1s;}
+  .slot-light:nth-child(3n+2){background:var(--sage); box-shadow:0 0 6px 1px var(--sage); animation-delay:.25s;}
+  @keyframes marquee{0%,100%{opacity:0.25;} 50%{opacity:1;}}
+  .ticket{background:repeating-linear-gradient(180deg, #0d0d0d 0px, #0d0d0d 2px, #161616 2px, #161616 4px); border:3px solid var(--ink); border-radius:0; padding:28px 18px; width:100%; position:relative; box-shadow:inset 0 0 0 2px var(--butter);}
+  .ticket .label{font-family:'Press Start 2P', monospace; font-size:10px; letter-spacing:0.02em; color:var(--butter); margin-bottom:14px; text-shadow:1px 1px 0 var(--ink);}
+  .ticket .winner-name{font-family:'VT323', monospace; font-size:34px; font-weight:700; line-height:1.2; min-height:74px; display:flex; align-items:center; justify-content:center; color:var(--butter); background:var(--ink); border:2px solid var(--butter); padding:6px 10px; text-shadow:2px 2px 0 rgba(228,0,15,0.6);}
+  .winner-meta{color:var(--cream-dim); font-size:16px; margin-top:14px; text-shadow:1px 1px 0 var(--ink);}
   .spin-actions{width:100%; margin-top:22px; display:flex; flex-direction:column; gap:10px;}
-  @keyframes flicker{0%{opacity:0.3; transform:translateY(2px);} 50%{opacity:1; transform:translateY(0);} 100%{opacity:0.3; transform:translateY(2px);}}
-  .spinning{animation:flicker .09s infinite;}
-  .spinner-dot{display:inline-block; width:8px; height:8px; border-radius:0; background:var(--butter); margin:0 3px; animation:flicker .5s infinite;}
+  @keyframes reelspin{0%{transform:translateY(-5px); filter:blur(1.5px);} 50%{transform:translateY(0); filter:blur(0);} 100%{transform:translateY(5px); filter:blur(1.5px);}}
+  .spinning{animation:reelspin .09s linear infinite;}
+  .spinner-dot{display:inline-block; width:8px; height:8px; border-radius:0; background:var(--butter); margin:0 3px; animation:marquee .5s infinite;}
+  .handoff-card{text-align:center; padding:40px 22px;}
+  .handoff-card .avatar.xl{width:88px; margin-bottom:14px;}
+  .voter-progress{font-family:'Press Start 2P', monospace; font-size:9px; color:var(--cream-dim); text-shadow:2px 2px 0 var(--ink); margin-bottom:10px;}
+  .back-link{display:inline-block; font-size:14px; color:var(--cream); text-decoration:underline; margin-bottom:12px; text-shadow:2px 2px 0 var(--ink);}
   .hero-sprite{display:block; margin:0 auto 10px; width:56%; max-width:220px; height:auto; image-rendering:pixelated; image-rendering:crisp-edges;}
   .avatar{width:24px; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; flex-shrink:0;}
   .avatar.lg{width:38px;}
@@ -118,7 +127,6 @@
   <img src="/couple-sprite.png" alt="" class="hero-sprite">
   <h1 style="text-align:center;">Dinner Decider</h1>
   <p class="sub">Vote, veto, spin. No more circling for twenty minutes.</p>
-  <button class="btn ghost small" id="refresh-app-btn" style="align-self:center; margin-bottom:16px;">&#8635; Refresh app</button>
 
   <div class="tabs">
     <div class="tab active" data-tab="round">Tonight</div>
@@ -170,6 +178,14 @@ function migrate(s){
   if(s.places){
     s.places = s.places.filter(p => !PLACEHOLDER_PLACE_NAMES.has((p.name||'').trim().toLowerCase()));
   }
+  if(!s.round) s.round = { selectedPeople: [], votes: {}, vetoes: {} };
+  if(!s.round.votes) s.round.votes = {};
+  if(!s.round.vetoes) s.round.vetoes = {};
+  // Older saves stored one veto per person as a single placeId string — normalize to arrays.
+  Object.keys(s.round.vetoes).forEach(pid=>{
+    const v = s.round.vetoes[pid];
+    if(v && !Array.isArray(v)) s.round.vetoes[pid] = [v];
+  });
   return s;
 }
 function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -671,6 +687,7 @@ function renderPeopleManage(){
       state.round.selectedPeople = state.round.selectedPeople.filter(id=>id!==btn.dataset.removePerson);
       delete state.round.votes[btn.dataset.removePerson];
       delete state.round.vetoes[btn.dataset.removePerson];
+      resetVotingFlow();
       saveState(); renderPeopleManage();
     });
   });
@@ -686,6 +703,10 @@ document.getElementById('add-person-btn').addEventListener('click', ()=>{
 });
 
 // ---------- Round ----------
+let votingStarted = false;
+let currentVoterIdx = 0;
+let awaitingHandoff = false;
+function resetVotingFlow(){ votingStarted = false; currentVoterIdx = 0; awaitingHandoff = false; }
 function renderRound(){
   const body = document.getElementById('round-body');
   if(state.places.length < 2){
@@ -726,50 +747,86 @@ function renderRound(){
   if(state.people.length === 0){ body.innerHTML = '<div class="empty">Add people on the People tab so they can vote.</div>'; return; }
 
   const sel = state.round.selectedPeople;
-  let html = `<h2>Who's in tonight?</h2><p class="sub">Tap everyone voting this round.</p><div class="people-list">`;
-  state.people.forEach(p=>{
-    const isSel = sel.includes(p.id);
-    html += `<div class="person-pill ${isSel?'selected':''}" data-toggle-person="${p.id}"><img class="avatar" src="${avatarForName(p.name)}" alt="">${escapeHtml(p.name)}</div>`;
-  });
-  html += `</div>`;
 
-  if(sel.length === 0){
-    html += `<div class="empty">Pick at least one person to start voting.</div>`;
+  if(!votingStarted){
+    let html = `<h2>Who's in tonight?</h2><p class="sub">Tap everyone voting this round.</p><div class="people-list">`;
+    state.people.forEach(p=>{
+      const isSel = sel.includes(p.id);
+      html += `<div class="person-pill ${isSel?'selected':''}" data-toggle-person="${p.id}"><img class="avatar" src="${avatarForName(p.name)}" alt="">${escapeHtml(p.name)}</div>`;
+    });
+    html += `</div>`;
+
+    if(sel.length === 0){
+      html += `<div class="empty">Pick at least one person to start voting.</div>`;
+      body.innerHTML = html;
+      attachPersonToggles();
+      return;
+    }
+
+    html += `<p class="sub" style="margin-top:-6px;">Each person votes privately, one at a time &mdash; hand the phone off when it's their turn. Up to two picks and five vetoes each, none required.</p>`;
+    html += `<button class="btn" id="start-voting-btn" style="margin-top:6px;">Start voting</button>`;
     body.innerHTML = html;
     attachPersonToggles();
+    document.getElementById('start-voting-btn').addEventListener('click', ()=>{
+      votingStarted = true; currentVoterIdx = 0; awaitingHandoff = false;
+      renderRound();
+    });
     return;
   }
 
-  html += `<hr class="divider"><h2>Votes &amp; vetoes</h2><p class="sub">Two votes and one veto each, none required.</p>`;
-  sel.forEach(personId=>{
-    const person = state.people.find(p=>p.id===personId);
-    if(!person) return;
-    const votes = state.round.votes[personId] || [];
-    const veto = state.round.vetoes[personId];
-    html += `<div class="voter-block"><div class="voter-name" style="display:flex; align-items:center; gap:8px;"><img class="avatar" src="${avatarForName(person.name)}" alt="">${escapeHtml(person.name)}</div><div class="card" style="padding:4px 16px;">`;
-    const placesByDrive = [...state.places].sort((a,b)=>a.distance-b.distance);
-    placesByDrive.forEach(place=>{
-      const voteOn = votes.includes(place.id);
-      const vetoOn = veto === place.id;
-      html += `<div class="vote-row">
-        <div class="drive-time-lg">${place.distance}<span class="drive-time-unit">min</span></div>
-        <div class="spot-name-col" style="text-align:left;">
-          <div class="place-name">${escapeHtml(place.name)}</div>
-          ${place.placeId ? `<a class="maplink" href="${mapsLinkForPlace(place)}" target="_blank" rel="noopener">View on Google Maps</a>` : ''}
-        </div>
-        <div class="vote-controls">
-          <button class="vbtn ${voteOn?'vote-on':''}" data-vote-person="${personId}" data-vote-place="${place.id}" title="Vote">&#9733;</button>
-          <button class="vbtn ${vetoOn?'veto-on':''}" data-veto-person="${personId}" data-veto-place="${place.id}" title="Veto">&#10005;</button>
-        </div>
-      </div>`;
-    });
-    html += `</div></div>`;
+  // Voting is underway — a handoff interstitial or one voter's private ballot at a time.
+  if(sel.length === 0){ resetVotingFlow(); renderRound(); return; }
+  const person = state.people.find(p=>p.id === sel[currentVoterIdx]);
+  if(!person){ resetVotingFlow(); renderRound(); return; }
+
+  if(awaitingHandoff){
+    body.innerHTML = `
+      <div class="card handoff-card">
+        <img class="avatar xl" src="${avatarForName(person.name)}" alt="">
+        <h2 style="text-align:center;">Pass the phone to<br>${escapeHtml(person.name)}</h2>
+        <p class="sub" style="text-align:center;">No peeking at anyone else's picks.</p>
+        <button class="btn" id="handoff-ready-btn" style="margin-top:10px;">I'm ${escapeHtml(person.name)} &mdash; let's go</button>
+      </div>
+      <a class="back-link" id="cancel-voting-link" style="text-align:center; display:block; margin-top:10px;">&larr; Cancel voting</a>
+    `;
+    document.getElementById('handoff-ready-btn').addEventListener('click', ()=>{ awaitingHandoff = false; renderRound(); });
+    document.getElementById('cancel-voting-link').addEventListener('click', ()=>{ resetVotingFlow(); renderRound(); });
+    return;
+  }
+
+  const votes = state.round.votes[person.id] || [];
+  const vetoes = state.round.vetoes[person.id] || [];
+  const isLast = currentVoterIdx === sel.length - 1;
+  let html = `<a class="back-link" id="back-to-select-link">&larr; Change who's voting</a>`;
+  html += `<div class="voter-progress">VOTER ${currentVoterIdx+1} OF ${sel.length}</div>`;
+  html += `<h2 style="display:flex; align-items:center; gap:8px;"><img class="avatar" src="${avatarForName(person.name)}" alt="">${escapeHtml(person.name)}'s picks</h2>`;
+  html += `<p class="sub">Up to two votes, up to five vetoes. Private until you hand off.</p>`;
+  html += `<div class="card" style="padding:4px 16px;">`;
+  const placesByDrive = [...state.places].sort((a,b)=>a.distance-b.distance);
+  placesByDrive.forEach(place=>{
+    const voteOn = votes.includes(place.id);
+    const vetoOn = vetoes.includes(place.id);
+    html += `<div class="vote-row">
+      <div class="drive-time-lg">${place.distance}<span class="drive-time-unit">min</span></div>
+      <div class="spot-name-col" style="text-align:left;">
+        <div class="place-name">${escapeHtml(place.name)}</div>
+        ${place.placeId ? `<a class="maplink" href="${mapsLinkForPlace(place)}" target="_blank" rel="noopener">View on Google Maps</a>` : ''}
+      </div>
+      <div class="vote-controls">
+        <button class="vbtn ${voteOn?'vote-on':''}" data-vote-person="${person.id}" data-vote-place="${place.id}" title="Vote">&#9733;</button>
+        <button class="vbtn ${vetoOn?'veto-on':''}" data-veto-person="${person.id}" data-veto-place="${place.id}" title="Veto">&#10005;</button>
+      </div>
+    </div>`;
   });
-  html += `<button class="btn" id="spin-btn" style="margin-top:8px;">Spin</button>`;
+  html += `</div>`;
+  html += `<button class="btn" id="voter-done-btn" style="margin-top:14px;">${isLast ? 'Done voting &mdash; Spin!' : `Done &mdash; pass to ${escapeHtml(state.people.find(p=>p.id===sel[currentVoterIdx+1])?.name || 'next')}`}</button>`;
   body.innerHTML = html;
-  attachPersonToggles();
   attachVoteHandlers();
-  document.getElementById('spin-btn').addEventListener('click', doSpin);
+  document.getElementById('back-to-select-link').addEventListener('click', ()=>{ resetVotingFlow(); renderRound(); });
+  document.getElementById('voter-done-btn').addEventListener('click', ()=>{
+    if(isLast){ doSpin(); }
+    else { currentVoterIdx++; awaitingHandoff = true; renderRound(); }
+  });
 }
 
 function attachPersonToggles(){
@@ -779,6 +836,7 @@ function attachPersonToggles(){
       const idx = state.round.selectedPeople.indexOf(id);
       if(idx === -1) state.round.selectedPeople.push(id);
       else state.round.selectedPeople.splice(idx,1);
+      resetVotingFlow();
       saveState(); renderRound();
     });
   });
@@ -792,21 +850,28 @@ function attachVoteHandlers(){
       if(idx !== -1){ votes.splice(idx,1); }
       else { if(votes.length >= 2) votes.shift(); votes.push(placeId); }
       state.round.votes[pid] = votes;
-      if(state.round.vetoes[pid] === placeId) delete state.round.vetoes[pid];
+      const vetoes = state.round.vetoes[pid] || [];
+      const vidx = vetoes.indexOf(placeId);
+      if(vidx !== -1) vetoes.splice(vidx,1);
+      state.round.vetoes[pid] = vetoes;
       saveState(); renderRound();
     });
   });
   document.querySelectorAll('[data-veto-person]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const pid = btn.dataset.vetoPerson, placeId = btn.dataset.vetoPlace;
-      if(state.round.vetoes[pid] === placeId){ delete state.round.vetoes[pid]; }
+      const vetoes = state.round.vetoes[pid] || [];
+      const idx = vetoes.indexOf(placeId);
+      if(idx !== -1){ vetoes.splice(idx,1); }
       else {
-        state.round.vetoes[pid] = placeId;
+        if(vetoes.length >= 5) vetoes.shift();
+        vetoes.push(placeId);
         const votes = state.round.votes[pid] || [];
-        const idx = votes.indexOf(placeId);
-        if(idx !== -1) votes.splice(idx,1);
+        const vidx = votes.indexOf(placeId);
+        if(vidx !== -1) votes.splice(vidx,1);
         state.round.votes[pid] = votes;
       }
+      state.round.vetoes[pid] = vetoes;
       saveState(); renderRound();
     });
   });
@@ -840,7 +905,7 @@ function isKnownClosed(place){
 
 // ---------- Weighting & Spin ----------
 function computeWeights(){
-  const vetoedIds = new Set(Object.values(state.round.vetoes));
+  const vetoedIds = new Set(Object.values(state.round.vetoes).flat());
   const voteCounts = {};
   Object.values(state.round.votes).forEach(list=>{ list.forEach(placeId=>{ voteCounts[placeId] = (voteCounts[placeId]||0) + 1; }); });
   const candidates = state.places.filter(p=>!vetoedIds.has(p.id) && !isKnownClosed(p));
@@ -865,24 +930,31 @@ function weightedPick(weighted){
   for(const w of weighted){ r -= w.weight; if(r <= 0) return w.place; }
   return weighted[weighted.length-1].place;
 }
+function slotLightsRow(){
+  return `<div class="slot-lights">${Array.from({length:9}).map(()=>'<span class="slot-light"></span>').join('')}</div>`;
+}
 async function doSpin(){
-  const vetoedIds = new Set(Object.values(state.round.vetoes));
+  const vetoedIds = new Set(Object.values(state.round.vetoes).flat());
   const idsToCheck = state.places.filter(p=>!vetoedIds.has(p.id) && p.placeId).map(p=>p.placeId);
   if(idsToCheck.length){
     const checkingBody = document.getElementById('round-body');
-    checkingBody.innerHTML = `<div class="spin-stage"><div class="ticket"><div class="label">checking who's open&hellip;</div><div class="winner-name"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span></div></div></div>`;
+    checkingBody.innerHTML = `<div class="spin-stage"><div class="slot-frame">${slotLightsRow()}<div class="ticket"><div class="label">checking who's open&hellip;</div><div class="winner-name"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span></div></div>${slotLightsRow()}</div></div>`;
     await refreshOpenStatus(idsToCheck);
   }
   const weighted = computeWeights();
-  if(weighted.length === 0){ alert("Nothing eligible right now — everything's either vetoed or closed. Try again closer to dinnertime, or free up a pick."); renderRound(); return; }
+  if(weighted.length === 0){ alert("Nothing eligible right now — everything's either vetoed or closed. Try again closer to dinnertime, or free up a pick."); resetVotingFlow(); renderRound(); return; }
   const winner = weightedPick(weighted);
   const body = document.getElementById('round-body');
   body.innerHTML = `
     <div class="spin-stage">
-      <div class="ticket">
-        <div class="label">tonight, you're eating at</div>
-        <div class="winner-name spinning" id="winner-name">...</div>
-        <div class="winner-meta" id="winner-meta"></div>
+      <div class="slot-frame">
+        ${slotLightsRow()}
+        <div class="ticket">
+          <div class="label">&#127920; tonight, you're eating at &#127920;</div>
+          <div class="winner-name spinning" id="winner-name">...</div>
+          <div class="winner-meta" id="winner-meta"></div>
+        </div>
+        ${slotLightsRow()}
       </div>
       <div class="spin-actions">
         <button class="btn ghost" id="respin-btn">Spin again</button>
@@ -911,16 +983,11 @@ async function doSpin(){
     if(p) p.lastVisited = new Date().toISOString();
     state.round.votes = {};
     state.round.vetoes = {};
+    resetVotingFlow();
     saveState();
     renderRound();
   });
 }
-
-// ---------- Refresh app (force a fresh copy past any cached version) ----------
-const refreshAppBtn = document.getElementById('refresh-app-btn');
-if(refreshAppBtn) refreshAppBtn.addEventListener('click', ()=>{
-  window.location.href = window.location.pathname + '?_=' + Date.now();
-});
 
 // ---------- Init ----------
 renderRound();
