@@ -2,7 +2,7 @@ function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 // Places we never want to see in the auto-import results.
 // Edit these lists any time — they only affect "Find restaurants", not manual lookups.
-const EXCLUDED_TYPES = new Set(['gas_station']);
+const EXCLUDED_TYPES = new Set(['gas_station', 'cafe']);
 const EXCLUDED_NAME_KEYWORDS = [
   // fast food
   "mcdonald's", "mcdonalds", "burger king", "wendy's", "wendys", "taco bell", "kfc",
@@ -14,6 +14,9 @@ const EXCLUDED_NAME_KEYWORDS = [
   "captain d's", "captain ds", "subway",
   // donut shops (chains and the category in general)
   "dunkin", "krispy kreme", "donut", "doughnut",
+  // coffee shops (chains and the category in general)
+  "starbucks", "peet's", "peets coffee", "caribou coffee", "dutch bros", "tim hortons",
+  "scooter's coffee", "scooters coffee", "coffee bean & tea leaf", "coffee shop", "coffeehouse",
   // pizza franchises
   "domino's", "dominos", "pizza hut", "papa john's", "papa johns", "little caesars",
   "papa murphy's", "papa murphys", "marco's pizza", "marcos pizza", "jet's pizza",
