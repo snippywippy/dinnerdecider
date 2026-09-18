@@ -64,6 +64,13 @@
   .icon-btn.remove:active{background:var(--rust); color:var(--cream);}
   .empty{text-align:center; color:var(--ink-dim); font-size:16px; padding:36px 20px; line-height:1.6;}
   .maplink{display:inline-block; font-size:13px; color:var(--sage); text-decoration:underline; margin-top:6px;}
+  .drive-cat-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .drive-cat-cluster{display:flex; align-items:center; gap:8px; flex-shrink:0;}
+  .drive-time-lg{font-family:'Press Start 2P', monospace; font-size:15px; color:var(--ink); text-align:right; line-height:1.35;}
+  .drive-time-lg .drive-time-unit{display:block; font-size:8px; color:var(--ink-dim); margin-top:2px; letter-spacing:0.03em;}
+  .cat-badge{width:54px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; border:3px solid var(--ink); background:var(--cream-dim); padding:5px 2px; box-shadow:var(--shadow-sm);}
+  .cat-icon{font-size:22px; line-height:1;}
+  .cat-label{font-family:'Press Start 2P', monospace; font-size:6px; letter-spacing:0.01em; margin-top:4px; text-align:center; line-height:1.25; color:var(--ink); word-break:break-word;}
   .divider{border:0; border-top:3px solid var(--ink); margin:22px 0;}
   .status{font-size:14px; color:var(--sage); margin-top:8px; line-height:1.4;}
   .status.error{color:var(--rust);}
@@ -270,6 +277,20 @@ function guessCategory(name, types){
   return 'American';
 }
 
+const CATEGORY_ICONS = {
+  'Mexican': '\ud83c\udf2e', 'Italian': '\ud83c\udf5d', 'Pizza': '\ud83c\udf55',
+  'Japanese': '\ud83c\udf63', 'Thai': '\ud83c\udf5c', 'Chinese': '\ud83e\udd61',
+  'Indian': '\ud83c\udf5b', 'Vietnamese': '\ud83c\udf5c', 'Mediterranean': '\ud83e\udd59',
+  'BBQ': '\ud83c\udf56', 'Steakhouse': '\ud83e\udd69', 'Seafood': '\ud83e\udd90',
+  'Burgers': '\ud83c\udf54', 'Brewery': '\ud83c\udf7a', 'Breakfast': '\ud83e\udd5e',
+  'Bakery': '\ud83e\uddc1', 'Vegetarian': '\ud83e\udd57', 'Wings': '\ud83c\udf57',
+  'Deli': '\ud83e\udd6a', 'Bar & Grill': '\ud83c\udf7b', 'American': '\ud83c\udf7d\ufe0f'
+};
+function categoryBadge(category){
+  const emoji = CATEGORY_ICONS[category] || '\ud83c\udf7d\ufe0f';
+  return `<div class="cat-badge"><div class="cat-icon">${emoji}</div><div class="cat-label">${escapeHtml((category||'').toUpperCase())}</div></div>`;
+}
+
 function mapsLinkForPlace(p){
   if(!p || !p.placeId) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name || '')}&query_place_id=${encodeURIComponent(p.placeId)}`;
@@ -291,6 +312,8 @@ let importStatus = '';
 let importLoading = false;
 let lastLookupPlaceId = null;
 let lastLookupName = null;
+let lastLookupPrice = 2;
+let lastLookupHealth = 'moderate';
 
 async function findNearbyRestaurants(){
   if(!state.settings.homeLat){
@@ -387,16 +410,7 @@ function renderPlacesTab(){
       </div>
       <div class="status" id="lookup-status"></div>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Drive (minutes)</label><input id="p-distance" type="number" inputmode="numeric" placeholder="15"></div>
-      <div class="field"><label>Price</label>
-        <select id="p-price"><option value="1">$</option><option value="2" selected>$$</option><option value="3">$$$</option></select>
-      </div>
-    </div>
-    <div class="field">
-      <label>Health profile</label>
-      <select id="p-health"><option value="light">Light</option><option value="moderate" selected>Moderate</option><option value="indulgent">Indulgent</option></select>
-    </div>
+    <div class="field"><label>Drive (minutes)</label><input id="p-distance" type="number" inputmode="numeric" placeholder="15"></div>
     <button class="btn" id="add-place-btn">Add spot</button>
   `;
 
@@ -413,44 +427,27 @@ function renderPlacesList(){
     mount.innerHTML = '<div class="empty">No spots yet. Add one below, or set up the import.</div>';
     return;
   }
-  mount.innerHTML = state.places.map(p=>{
+  const sorted = [...state.places].sort((a,b)=>a.distance-b.distance);
+  mount.innerHTML = sorted.map(p=>{
     const lastVisited = p.lastVisited ? daysAgoLabel(p.lastVisited) : 'Never logged';
-    const healthLabel = {light:'Light', moderate:'Moderate', indulgent:'Indulgent'}[p.health];
     return `<div class="card" data-place-card="${p.id}">
-      <div class="row" data-expand-place="${p.id}" style="cursor:pointer;">
-        <div>
-          <div class="place-name">${escapeHtml(p.name)}</div>
-          <div class="place-meta">
-            <span class="chip">${escapeHtml(guessCategory(p.name))}</span>
-            <span class="chip">${p.distance} min drive</span>
-            <span class="chip">${'$'.repeat(p.price)}</span>
-            <span class="chip">${healthLabel}</span>
-            <span class="chip">${lastVisited}</span>
+      <div class="row" data-expand-place="${p.id}" style="cursor:pointer; align-items:flex-start;">
+        <div class="drive-cat-row" style="flex:1;">
+          <div>
+            <div class="place-name">${escapeHtml(p.name)}</div>
+            <div class="place-meta"><span class="chip">${lastVisited}</span></div>
+            ${p.placeId ? `<a class="maplink" href="${mapsLinkForPlace(p)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
           </div>
-          ${p.placeId ? `<a class="maplink" href="${mapsLinkForPlace(p)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
+          <div class="drive-cat-cluster">
+            <div class="drive-time-lg">${p.distance}<span class="drive-time-unit">min</span></div>
+            ${categoryBadge(guessCategory(p.name))}
+          </div>
         </div>
         <button class="icon-btn remove" data-remove-place="${p.id}">&times;</button>
       </div>
       ${p._editing ? `
         <div class="edit-form">
-          <div class="field-row">
-            <div class="field"><label>Drive (minutes)</label><input type="number" class="edit-distance" data-edit-id="${p.id}" value="${p.distance}"></div>
-            <div class="field"><label>Price</label>
-              <select class="edit-price" data-edit-id="${p.id}">
-                <option value="1" ${p.price==1?'selected':''}>$</option>
-                <option value="2" ${p.price==2?'selected':''}>$$</option>
-                <option value="3" ${p.price==3?'selected':''}>$$$</option>
-              </select>
-            </div>
-          </div>
-          <div class="field">
-            <label>Health profile</label>
-            <select class="edit-health" data-edit-id="${p.id}">
-              <option value="light" ${p.health==='light'?'selected':''}>Light</option>
-              <option value="moderate" ${p.health==='moderate'?'selected':''}>Moderate</option>
-              <option value="indulgent" ${p.health==='indulgent'?'selected':''}>Indulgent</option>
-            </select>
-          </div>
+          <div class="field"><label>Drive (minutes)</label><input type="number" class="edit-distance" data-edit-id="${p.id}" value="${p.distance}"></div>
           <button class="btn small" data-save-edit="${p.id}">Save</button>
         </div>
       ` : ''}
@@ -479,11 +476,7 @@ function renderPlacesList(){
       const p = state.places.find(p=>p.id===id);
       if(!p) return;
       const distEl = mount.querySelector(`.edit-distance[data-edit-id="${id}"]`);
-      const priceEl = mount.querySelector(`.edit-price[data-edit-id="${id}"]`);
-      const healthEl = mount.querySelector(`.edit-health[data-edit-id="${id}"]`);
       p.distance = parseInt(distEl.value, 10) || p.distance;
-      p.price = parseInt(priceEl.value, 10);
-      p.health = healthEl.value;
       p._editing = false;
       saveState(); renderPlacesList();
     });
@@ -570,8 +563,8 @@ function attachPlacesTabHandlers(){
       const place = await findPlaceByName(query);
       const miles = haversineMiles(state.settings.homeLat, state.settings.homeLng, place.lat, place.lng);
       document.getElementById('p-distance').value = estimateMinutes(miles);
-      document.getElementById('p-price').value = mapPriceLevel(place.price_level);
-      document.getElementById('p-health').value = guessHealth(place.name, place.types);
+      lastLookupPrice = mapPriceLevel(place.price_level);
+      lastLookupHealth = guessHealth(place.name, place.types);
       nameEl.value = place.name;
       lastLookupPlaceId = place.place_id || null;
       lastLookupName = place.name;
@@ -590,12 +583,13 @@ function attachPlacesTabHandlers(){
   if(addBtn) addBtn.addEventListener('click', ()=>{
     const name = document.getElementById('p-name').value.trim();
     const distance = parseInt(document.getElementById('p-distance').value, 10);
-    const price = parseInt(document.getElementById('p-price').value, 10);
-    const health = document.getElementById('p-health').value;
     if(!name){ document.getElementById('p-name').focus(); return; }
-    const placeId = (lastLookupName === name) ? lastLookupPlaceId : null;
+    const matched = lastLookupName === name;
+    const placeId = matched ? lastLookupPlaceId : null;
+    const price = matched ? lastLookupPrice : 2;
+    const health = matched ? lastLookupHealth : 'moderate';
     state.places.push({ id: uid(), name, distance: isNaN(distance) ? 15 : distance, price, health, lastVisited: null, placeId });
-    lastLookupPlaceId = null; lastLookupName = null;
+    lastLookupPlaceId = null; lastLookupName = null; lastLookupPrice = 2; lastLookupHealth = 'moderate';
     saveState();
     document.getElementById('p-name').value = '';
     document.getElementById('p-distance').value = '';
@@ -614,19 +608,15 @@ function renderImportResults(){
       ${importResults.results.map((r,i)=>`
         <div class="checklist-item">
           <input type="checkbox" data-import-check="${i}" ${r.checked?'checked':''}>
-          <div style="flex:1;">
-            <div class="place-name" style="font-size:14.5px;">${escapeHtml(r.name)}</div>
-            <div class="place-meta">
-              <span class="chip">${escapeHtml(r.category)}</span>
-              <span class="chip">${'$'.repeat(r.price)}</span>
-              <span class="chip">${r.distance} min drive</span>
+          <div class="drive-cat-row" style="flex:1;">
+            <div>
+              <div class="place-name" style="font-size:14.5px;">${escapeHtml(r.name)}</div>
+              ${r.placeId ? `<a class="maplink" href="${mapsLinkForPlace(r)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
             </div>
-            ${r.placeId ? `<a class="maplink" href="${mapsLinkForPlace(r)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View on Google Maps</a>` : ''}
-            <select data-import-health="${i}">
-              <option value="light" ${r.health==='light'?'selected':''}>Light</option>
-              <option value="moderate" ${r.health==='moderate'?'selected':''}>Moderate</option>
-              <option value="indulgent" ${r.health==='indulgent'?'selected':''}>Indulgent</option>
-            </select>
+            <div class="drive-cat-cluster">
+              <div class="drive-time-lg">${r.distance}<span class="drive-time-unit">min</span></div>
+              ${categoryBadge(r.category)}
+            </div>
           </div>
         </div>
       `).join('')}
@@ -637,11 +627,6 @@ function renderImportResults(){
     cb.addEventListener('change', ()=>{
       importResults.results[parseInt(cb.dataset.importCheck,10)].checked = cb.checked;
       renderImportResults();
-    });
-  });
-  mount.querySelectorAll('[data-import-health]').forEach(sel=>{
-    sel.addEventListener('change', ()=>{
-      importResults.results[parseInt(sel.dataset.importHealth,10)].health = sel.value;
     });
   });
   const addCheckedBtn = document.getElementById('add-checked-btn');
@@ -754,7 +739,8 @@ function renderRound(){
     const votes = state.round.votes[personId] || [];
     const veto = state.round.vetoes[personId];
     html += `<div class="voter-block"><div class="voter-name" style="display:flex; align-items:center; gap:8px;"><img class="avatar" src="${avatarForName(person.name)}" alt="">${escapeHtml(person.name)}</div>`;
-    state.places.forEach(place=>{
+    const placesByDrive = [...state.places].sort((a,b)=>a.distance-b.distance);
+    placesByDrive.forEach(place=>{
       const voteOn = votes.includes(place.id);
       const vetoOn = veto === place.id;
       html += `<div class="vote-row">
@@ -904,7 +890,7 @@ async function doSpin(){
       nameEl.classList.remove('spinning');
       nameEl.textContent = winner.name;
       const winnerLink = mapsLinkForPlace(winner);
-      document.getElementById('winner-meta').innerHTML = `${escapeHtml(guessCategory(winner.name))} · ${winner.distance} min drive · ${'$'.repeat(winner.price)} · ${winner.health}` + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
+      document.getElementById('winner-meta').innerHTML = `${escapeHtml(guessCategory(winner.name))} · ${winner.distance} min drive` + (winnerLink ? `<br><a class="maplink" href="${winnerLink}" target="_blank" rel="noopener">View on Google Maps</a>` : '');
     }
   }, 80);
   document.getElementById('respin-btn').addEventListener('click', doSpin);
